@@ -6,6 +6,15 @@ import (
 	"github.com/gonum/matrix/mat64"
 )
 
+// RandomVector fills each component of a vector with random numbers in
+// [min, max].
+func RandomVector(min, max float64, v *mat64.Vector) {
+	numComponents := v.Len()
+	for idx := 0; idx < numComponents; idx++ {
+		v.SetVec(idx, RandomRange(min, max))
+	}
+}
+
 // RandomDense fills each cell of a matrix with random numbers in [min, max].
 func RandomDense(min, max float64, m *mat64.Dense) {
 	numRows, numCols := m.Dims()
