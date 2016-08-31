@@ -10,9 +10,10 @@ import (
 
 // Args holds names parameters to the NewRNN() constructor.
 type Args struct {
-	NumInput  int
-	NumHidden int
-	NumOutput int
+	NumInput      int
+	NumHidden     int
+	NumOutput     int
+	BackPropDepth int
 }
 
 // RNN is a vanilla Recursive Neuron Network. All fields are exported for
@@ -21,6 +22,7 @@ type RNN struct {
 	InputDim       int
 	HiddenDim      int
 	OutputDim      int
+	BackPropDepth  int
 	InputToHidden  *mat64.Dense
 	HiddenToHidden *mat64.Dense
 	HiddenToOutput *mat64.Dense
@@ -29,17 +31,20 @@ type RNN struct {
 // NewRNN is a constructor for SimpleRNN. Initializes weight matrices.
 func NewRNN(args *Args) *RNN {
 	out := &RNN{
-		InputDim:  args.NumInput,
-		HiddenDim: args.NumHidden,
-		OutputDim: args.NumOutput,
+		InputDim:      args.NumInput,
+		HiddenDim:     args.NumHidden,
+		OutputDim:     args.NumOutput,
+		BackPropDepth: args.BackPropDepth,
 	}
 	out.init()
 	return out
 }
 
-// Forward performs.
-func (n *RNN) Forward(samples *mat64.Dense) (outs, hids *mat64.Dense) {
-	numSteps, _ := samples.Dims()
+// Forward returns all outputs and all corresponding hidden states for and
+// @input. @input can be a matrix representation of a single sentence where
+// rows are one-hot encoded words.
+func (n *RNN) Forward(input *mat64.Dense) (outs, hids *mat64.Dense) {
+	numSteps, _ := input.Dims()
 	// Allocate space for all hidden states that we get while propagating
 	hiddens := mat64.NewDense(numSteps, n.HiddenDim, nil)
 	// Allocate space for all outputs that we get while propagating
@@ -48,14 +53,14 @@ func (n *RNN) Forward(samples *mat64.Dense) (outs, hids *mat64.Dense) {
 	// create it with a "zero mock" t-1 hidden state and the first element
 	// of the @samples
 	initialHidden := n.getHidden(
-		mat64.NewVector(n.HiddenDim, nil), samples.RowView(0),
+		mat64.NewVector(n.HiddenDim, nil), input.RowView(0),
 	)
 	hiddens.SetRow(0, initialHidden.RawVector().Data)
 	outputs.SetRow(0, n.getOutputSlice(initialHidden))
 	// For each time step
 	for t := 1; t < numSteps; t++ {
 		var (
-			currSample = samples.RowView(t)
+			currSample = input.RowView(t)
 			currHidden = hiddens.RowView(t)
 			prevHidden = hiddens.RowView(t - 1)
 		)
@@ -63,6 +68,21 @@ func (n *RNN) Forward(samples *mat64.Dense) (outs, hids *mat64.Dense) {
 		outputs.SetRow(t, n.getOutputSlice(currHidden))
 	}
 	return outputs, hiddens
+}
+
+// Backward returns three derivatives of the loss:
+func (n *RNN) Backward(input, expected *mat64.Dense) (i, h, o *mat64.Dense) {
+	var (
+		// numSteps, _      = input.Dims()
+		// outs, hids       = n.Forward(input) // Outputs and hidden layers
+		inRows, inCols   = n.InputToHidden.Dims()
+		hidRows, hidCols = n.HiddenToHidden.Dims()
+		outRows, outCols = n.HiddenToOutput.Dims()
+		dLossdIn         = mat64.NewDense(inRows, inCols, nil)
+		dLossdHid        = mat64.NewDense(hidRows, hidCols, nil)
+		dLossdOut        = mat64.NewDense(outRows, outCols, nil)
+	)
+	return dLossdIn, dLossdHid, dLossdOut
 }
 
 // Print the NN's internals.
@@ -97,7 +117,7 @@ func (n *RNN) getHiddenSlice(prevHidden, sample *mat64.Vector) []float64 {
 }
 
 // getHidden calculates current hidden state as follows:
-//	1. 	Multiplies inputToHidden matrix the input sample (same as getting
+//	1. 	Multiplies inputToHidden matrix by the input sample (same as getting
 //		a weighted sum of inputs for each hidden neuron);
 // 	2.	Multiplies hiddenToHidden matrix by previous hidden layer (same as
 //		getting a weighted sum of inputs for each hidden neuron);
@@ -105,9 +125,9 @@ func (n *RNN) getHiddenSlice(prevHidden, sample *mat64.Vector) []float64 {
 //		(hyperbolic tanhent in this case).
 func (n *RNN) getHidden(prevHidden, sample *mat64.Vector) *mat64.Vector {
 	var (
+		out        = mat64.NewVector(n.HiddenDim, nil)
 		fromInput  = mat64.NewVector(n.HiddenDim, nil)
 		fromHidden = mat64.NewVector(n.HiddenDim, nil)
-		out        = mat64.NewVector(n.HiddenDim, nil)
 	)
 	fromInput.MulVec(n.InputToHidden, sample)
 	fromHidden.MulVec(n.HiddenToHidden, prevHidden)

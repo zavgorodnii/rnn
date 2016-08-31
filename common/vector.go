@@ -6,6 +6,14 @@ import (
 	"github.com/gonum/matrix/mat64"
 )
 
+func ApplyVector(v *mat64.Vector, cb func(float64) float64) *mat64.Vector {
+	out := mat64.NewVector(v.Len(), v.RawVector().Data)
+	for i := 0; i < out.Len(); i++ {
+		out.SetVec(i, cb(v.At(i, 0)))
+	}
+	return out
+}
+
 // SumVector returns the sum of all elements in a vector.
 func SumVector(v *mat64.Vector) float64 {
 	sum := .0
@@ -13,6 +21,14 @@ func SumVector(v *mat64.Vector) float64 {
 		sum += v.At(i, 0)
 	}
 	return sum
+}
+
+func PowVector(v *mat64.Vector, power float64) *mat64.Vector {
+	out := mat64.NewVector(v.Len(), v.RawVector().Data)
+	for i := 0; i < out.Len(); i++ {
+		out.SetVec(i, math.Pow(v.At(i, 0), power))
+	}
+	return out
 }
 
 // TanhVector returns a vector where each @v's component is replaced with its
