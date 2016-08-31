@@ -132,7 +132,7 @@ func (n *RNN) getHidden(prevHidden, sample *mat64.Vector) *mat64.Vector {
 	fromInput.MulVec(n.InputToHidden, sample)
 	fromHidden.MulVec(n.HiddenToHidden, prevHidden)
 	out.AddVec(fromInput, fromHidden)
-	return common.TanhVector(out)
+	return common.GetVectorTanh(out)
 }
 
 // getOutputSlice is a wrapper around getOutput() which returns a slice of
@@ -146,5 +146,5 @@ func (n *RNN) getOutputSlice(currHidden *mat64.Vector) []float64 {
 func (n *RNN) getOutput(currHidden *mat64.Vector) *mat64.Vector {
 	out := mat64.NewVector(n.OutputDim, nil)
 	out.MulVec(n.HiddenToOutput, currHidden)
-	return common.SoftmaxVector(out)
+	return common.GetVectorSoftmax(out)
 }

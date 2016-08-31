@@ -32,5 +32,5 @@ func SampleCrossEntropyError(predicted, expected *mat64.Vector) float64 {
 		out.SetVec(i, math.Log(out.At(i, 0)))
 	}
 	out.MulElemVec(expected, predicted)
-	return -SumVector(out)
+	return -GetVectorSum(out)
 }

@@ -11,7 +11,7 @@ import (
 func RandomVector(min, max float64, v *mat64.Vector) {
 	numComponents := v.Len()
 	for idx := 0; idx < numComponents; idx++ {
-		v.SetVec(idx, RandomRange(min, max))
+		v.SetVec(idx, GetRandomInRange(min, max))
 	}
 }
 
@@ -20,12 +20,12 @@ func RandomDense(min, max float64, m *mat64.Dense) {
 	numRows, numCols := m.Dims()
 	for rowIdx := 0; rowIdx < numRows; rowIdx++ {
 		for colIdx := 0; colIdx < numCols; colIdx++ {
-			m.Set(rowIdx, colIdx, RandomRange(min, max))
+			m.Set(rowIdx, colIdx, GetRandomInRange(min, max))
 		}
 	}
 }
 
 // RandomRange returns a random float64 in [min, max].
-func RandomRange(min, max float64) float64 {
+func GetRandomInRange(min, max float64) float64 {
 	return rand.Float64()*(max-min) + min
 }
