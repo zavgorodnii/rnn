@@ -1,12 +1,14 @@
 package main
 
 import (
+	"rnn/baseNN"
 	"rnn/common"
 	"rnn/simple"
 )
 
 func main() {
-	testSimpleRNN()
+	// testSimpleRNN()
+	baseNN.Run()
 }
 
 func testSimpleRNN() {
@@ -18,7 +20,7 @@ func testSimpleRNN() {
 	}
 	rnn := simple.NewRNN(args)
 	input := common.GetRandomDense(20, 5)
-	expected := common.GetRandomDense(20, 5)
+	// expected := common.GetRandomDense(20, 5)
 	// outputs, hiddens := rnn.Forward(input)
 	rnn.Forward(input)
 	// fmt.Println("Outputs:")
@@ -26,5 +28,5 @@ func testSimpleRNN() {
 	// fmt.Println("Hiddens:")
 	// common.PrintDense(hiddens)
 	// rnn.Print()
-	rnn.Backward(input, expected)
+	// rnn.Backward(input, expected)
 }
