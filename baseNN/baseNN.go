@@ -22,8 +22,10 @@ type Args struct {
 // indices and to use only named entities.
 type NN struct {
 	Eta float64
-	IH  *m.Dense // Weights from input layer to hidden layer
-	HO  *m.Dense // Weights from hidden layer to output layer
+	IH  *m.Dense  // Weights from input layer to hidden layer
+	HO  *m.Dense  // Weights from hidden layer to output layer
+	HB  *m.Vector // Biases for hidden neurons
+	OB  *m.Vector // Biases for output neurons
 }
 
 // NewNN is a constructor.
@@ -33,6 +35,8 @@ func NewNN(args *Args) *NN {
 	}
 	out.IH = m.NewDense(args.NumHid, args.NumInp, nil)
 	out.HO = m.NewDense(args.NumOut, args.NumHid, nil)
+	out.HB = m.NewVector(args.NumHid, nil)
+	out.OB = m.NewVector(args.NumOut, nil)
 	// Initialize at random as in (Glorot & Bengio, 2010):
 	// Positive upper boundary for random init weights for inputToHidden
 	maxIH := math.Sqrt(1. / float64(args.NumInp))
@@ -40,57 +44,70 @@ func NewNN(args *Args) *NN {
 	maxHO := math.Sqrt(1. / float64(args.NumHid))
 	c.RandomDense(-maxIH, maxIH, out.IH)
 	c.RandomDense(-maxHO, maxHO, out.HO)
+	// Same for hidden and output biases
+	c.RandomVector(-maxIH, maxIH, out.HB)
+	c.RandomVector(-maxHO, maxHO, out.OB)
 	return out
 }
 
-// Fit updates NN's weights for @input @numIterations times.
-func (n *NN) Fit(input, expected *m.Dense, numIterations int) {
+// Test updates NN's weights for @input @numEpochs times.
+func (n *NN) Test(input, expected *m.Dense, numEpochs int) {
 	numInputs, _ := input.Dims()
-	for iteration := 0; iteration < numIterations; iteration++ {
-		for i := 0; i < numInputs; i++ {
+	for epoch := 0; epoch < numEpochs; epoch++ {
+		idxRange := c.GetRangeInt(0, numInputs)
+		c.Shuffle(idxRange)
+		for _, i := range idxRange {
 			currInp := input.RowView(i)
 			currExp := expected.RowView(i)
 			n.Update(currInp, currExp)
 		}
-		totalError := .0
-		for i := 0; i < numInputs; i++ {
+		outputs := []*m.Vector{}
+		for _, i := range idxRange {
 			currInp := input.RowView(i)
-			currExp := expected.RowView(i)
 			_, acts := n.ForwardSample(currInp)
-			err := c.GetSubVec(acts.Out, currExp)
-			totalError += c.GetVectorAbs(err)
+			outputs = append(outputs, acts.Out)
 		}
-		fmt.Printf("Iteration %d; total error %f\n",
-			iteration, totalError/float64(numInputs))
+		_, totalOk := c.GetClassAccuracy(outputs, expected)
+		fmt.Printf("Epoch %d; %v out of %v\n", epoch, totalOk, numInputs)
 	}
 }
 
 // Update updates input-to-hidden and hidden-to-output weights using
 // error gradients on those weights retrieved by backpropagation.
-// Update are done by multiplying gradients by learning rate (Eta) and
+// Updates are done by multiplying gradients by learning rate (Eta) and
 // subtracting the result from the actual weights.
 // A quick note on why we do it this way. The partial derivative of error with
 // respect to any specific weight tells us how quickly the error grows when the
 // weight grows. As we want the error to become smaller, we *subtract* the
 // derivative times the learning rate from the actual weight.
 func (n *NN) Update(input, expected *m.Vector) {
-	dErrdIH, dErrdHO := n.BackPropSample(input, expected)
+	dErrdIH, dErrdHO, dErrdHB, dErrdOB := n.BackPropSample(input, expected)
 	etaIH := c.GetDenseApply(dErrdIH, func(val float64) float64 {
 		return val * n.Eta
 	})
 	etaHO := c.GetDenseApply(dErrdHO, func(val float64) float64 {
 		return val * n.Eta
 	})
+	etaHB := c.GetVectorApply(dErrdHB, func(val float64) float64 {
+		return val * n.Eta
+	})
+	etaOB := c.GetVectorApply(dErrdOB, func(val float64) float64 {
+		return val * n.Eta
+	})
 	n.IH.Sub(n.IH, etaIH)
 	n.HO.Sub(n.HO, etaHO)
+	n.HB.SubVec(n.HB, etaHB)
+	n.OB.SubVec(n.OB, etaOB)
 }
 
 // BackPropSample performs a forward pass for the input vector, calculates the
 // error and returns:
 //	1. Error gradients on each of input-to-hidden weights (dErrdIH)
 //	2. Error gradients on each of hidden-to-output weights (dErrdHO)
+//	3. Error gradients on hidden layer biases (dErrdHB)
+// 	4. Error gradients on output layer biases (dErrdOB)
 func (n *NN) BackPropSample(input, expected *m.Vector) (
-	dErrdIH, dErrdHO *m.Dense) {
+	dErrdIH, dErrdHO *m.Dense, dErrdHB, dErrdOB *m.Vector) {
 	// Get weighted sums and activations for all layers
 	sums, acts := n.ForwardSample(input)
 	// Calculate error for each neuron in the output layer
@@ -130,9 +147,9 @@ func (n *NN) BackPropSample(input, expected *m.Vector) (
 	ihRows, ihCols := n.IH.Dims()
 	dErrdIH = m.NewDense(ihRows, ihCols, nil)
 	dErrdIH.Outer(1., hidErrs, acts.Inp)
-	// Thus we get:
-	//	1. Error gradients on each of input-to-hidden weights (dErrdIH)
-	//	2. Error gradients on each of hidden-to-output weights (dErrdHO)
+	// Error gradients on hidden and output layer biases are just the errors
+	// on those layers
+	dErrdHB, dErrdOB = hidErrs, outErrs
 	return
 }
 
@@ -145,11 +162,19 @@ func (n *NN) BackPropSample(input, expected *m.Vector) (
 // the intermediate results (which will be used for backpropagation).
 func (n *NN) ForwardSample(input *m.Vector) (sums *Sums, acts *Acts) {
 	// Same as getting the weighted sum of inputs for all hidden neurons
-	hidSums := c.GetMulVec(n.IH, input)
+	// plus the hidden bias
+	hidSums := c.GetAddVec(
+		c.GetMulVec(n.IH, input),
+		n.HB,
+	)
 	// Apply sigmoid function to each hidden neuron (getting the activation)
 	hidActs := c.GetVectorSigmoid(hidSums)
 	// Same as getting the weighted sum of inputs for all output neurons
-	outSums := c.GetMulVec(n.HO, hidActs)
+	// plus the output bias
+	outSums := c.GetAddVec(
+		c.GetMulVec(n.HO, hidActs),
+		n.OB,
+	)
 	// Apply sigmoid function to each output neuron (getting the activation)
 	outActs := c.GetVectorSigmoid(outSums)
 	sums = &Sums{
@@ -168,7 +193,6 @@ func (n *NN) ForwardSample(input *m.Vector) (sums *Sums, acts *Acts) {
 // activations) ⊙ sigmoidPrime(output sums).
 func (n *NN) GetOutError(outActs, outSums, expected *m.Vector) *m.Vector {
 	outError := c.GetSubVec(outActs, expected)
-	// fmt.Println(outSums)
 	return c.GetMulElemVec(outError, c.GetVectorSigmoidPrime(outSums))
 }
 

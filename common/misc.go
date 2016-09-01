@@ -1,6 +1,6 @@
 package common
 
-import "github.com/gonum/matrix/mat64"
+import "math/rand"
 
 func MaxInt(a, b int) int {
 	if a > b {
@@ -9,6 +9,17 @@ func MaxInt(a, b int) int {
 	return b
 }
 
-func GetLastVector(slice []*mat64.Vector) *mat64.Vector {
-	return slice[len(slice)-1]
+func Shuffle(a []int) {
+	for i := range a {
+		j := rand.Intn(i + 1)
+		a[i], a[j] = a[j], a[i]
+	}
+}
+
+func GetRangeInt(lower, upper int) []int {
+	out := []int{}
+	for i := lower; i < upper; i++ {
+		out = append(out, i)
+	}
+	return out
 }

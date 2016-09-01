@@ -19,6 +19,12 @@ func GetMulVec(m *mat64.Dense, v *mat64.Vector) *mat64.Vector {
 	return out
 }
 
+func GetAddVec(v1, v2 *mat64.Vector) *mat64.Vector {
+	out := mat64.NewVector(v1.Len(), nil)
+	out.AddVec(v1, v2)
+	return out
+}
+
 func GetSubVec(v1, v2 *mat64.Vector) *mat64.Vector {
 	out := mat64.NewVector(v1.Len(), nil)
 	out.SubVec(v1, v2)

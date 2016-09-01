@@ -1,15 +1,19 @@
 package baseNN
 
-import "rnn/common"
+import (
+	"math/rand"
+	"rnn/common"
+	"time"
+)
 
 // Run fits an NN.
 func Run() {
+	rand.Seed(time.Now().UTC().UnixNano())
 	var (
-		numIterations = 1000
-		numSamples    = 100
-		numInput      = 7
+		numIterations = 100000
+		numInput      = 4
 		numHidden     = 5
-		numOutput     = 2
+		numOutput     = 3
 	)
 	args := &Args{
 		Eta:    0.001,
@@ -18,6 +22,6 @@ func Run() {
 		NumOut: numOutput,
 	}
 	nn := NewNN(args)
-	input, expected := common.GetTwoClass(numSamples, numInput)
-	nn.Fit(input, expected, numIterations)
+	input, expected := common.GetIris()
+	nn.Test(input, expected, numIterations)
 }
