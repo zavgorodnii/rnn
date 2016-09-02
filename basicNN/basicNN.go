@@ -90,7 +90,7 @@ func (n *NN) RunEpochs(numEpochs int, input, expected *m.Dense) {
 // Updates are performed as multiplying gradients by learning rate (Eta) and
 // subtracting the result from the actual weights.
 // A quick note on why we do it this way. The partial derivative of error with
-// respect to any specific weight tells us how quickly the error grows when the
+// respect to any specific weight tells us how fast the error grows when the
 // weight grows. As we want the error to become smaller, we *subtract* the
 // derivative times the learning rate from the actual weight.
 func (n *NN) Update(input, expected *m.Vector) {
