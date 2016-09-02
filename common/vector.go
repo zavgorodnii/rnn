@@ -6,14 +6,6 @@ import (
 	"github.com/gonum/matrix/mat64"
 )
 
-func GetVectorAbs(v *mat64.Vector) float64 {
-	sum := .0
-	for i := 0; i < v.Len(); i++ {
-		sum += math.Pow(v.At(i, 0), 2)
-	}
-	return math.Sqrt(sum)
-}
-
 // GetVectorSigmoid applies sigmoid function to each element in @v.
 func GetVectorSigmoid(v *mat64.Vector) *mat64.Vector {
 	out := mat64.NewVector(v.Len(), nil)
@@ -30,15 +22,6 @@ func GetVectorSigmoidPrime(v *mat64.Vector) *mat64.Vector {
 	return GetMulElemVec(sigm, GetVectorApply(sigm, func(i float64) float64 {
 		return 1.0 - i
 	}))
-}
-
-// GetVectorApply applies @cg to each element in @v.
-func GetVectorApply(v *mat64.Vector, cb func(float64) float64) *mat64.Vector {
-	out := mat64.NewVector(v.Len(), nil)
-	for i := 0; i < v.Len(); i++ {
-		out.SetVec(i, cb(v.At(i, 0)))
-	}
-	return out
 }
 
 // GetVectorSum returns the sum of all elements in @v.

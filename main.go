@@ -1,14 +1,14 @@
 package main
 
 import (
-	"rnn/baseNN"
+	"rnn/basicNN"
 	"rnn/common"
 	"rnn/simple"
 )
 
 func main() {
 	// testSimpleRNN()
-	baseNN.Run()
+	basicNN.Test()
 }
 
 func testSimpleRNN() {

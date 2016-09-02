@@ -1,4 +1,4 @@
-package baseNN
+package basicNN
 
 import (
 	"fmt"
@@ -10,28 +10,34 @@ import (
 
 // Args is a holder for arguments to NewNN().
 type Args struct {
-	Eta    float64
-	NumInp int
-	NumHid int
-	NumOut int
+	Eta    float64 // Learning rate
+	NumInp int     // Number of input neurons
+	NumHid int     // Number of hidden neurons
+	NumOut int     // Number of output neurons
 }
 
 // NN is a simple feed-forward neural network that has an input, a hidden and
 // an output layer. We use this simplified model (without the possibility to
 // add an arbitrary number of hidden layers) to reduce the number of obscure
 // indices and to use only named entities.
+//
+// This network is not optimized at all, e.g. it uses neither mini-batches or
+// full matrix operations while updating the weights and biases: all updates
+// are per sample (which is equivalent to mini-batch size of 1).
+//
+// Most fields and types are exported for easier introspection.
 type NN struct {
-	Eta float64
-	IH  *m.Dense  // Weights from input layer to hidden layer
-	HO  *m.Dense  // Weights from hidden layer to output layer
-	HB  *m.Vector // Biases for hidden neurons
-	OB  *m.Vector // Biases for output neurons
+	η  float64
+	IH *m.Dense  // Weights from input layer to hidden layer
+	HO *m.Dense  // Weights from hidden layer to output layer
+	HB *m.Vector // Biases for hidden neurons
+	OB *m.Vector // Biases for output neurons
 }
 
 // NewNN is a constructor.
 func NewNN(args *Args) *NN {
 	out := &NN{
-		Eta: args.Eta,
+		η: args.Eta,
 	}
 	out.IH = m.NewDense(args.NumHid, args.NumInp, nil)
 	out.HO = m.NewDense(args.NumOut, args.NumHid, nil)
@@ -50,66 +56,73 @@ func NewNN(args *Args) *NN {
 	return out
 }
 
-// Test updates NN's weights for @input @numEpochs times.
-func (n *NN) Test(input, expected *m.Dense, numEpochs int) {
+// RunEpochs updates NN's weights for @input @numEpochs times.
+func (n *NN) RunEpochs(numEpochs int, input, expected *m.Dense) {
 	numInputs, _ := input.Dims()
+	// For each epoch
 	for epoch := 0; epoch < numEpochs; epoch++ {
-		idxRange := c.GetRangeInt(0, numInputs)
-		c.Shuffle(idxRange)
-		for _, i := range idxRange {
+		// For each input
+		for i := 0; i < numInputs; i++ {
 			currInp := input.RowView(i)
 			currExp := expected.RowView(i)
+			// update the weights
 			n.Update(currInp, currExp)
 		}
-		outputs := []*m.Vector{}
-		for _, i := range idxRange {
+		// Gather predictions
+		predictions := []*m.Vector{}
+		for i := 0; i < numInputs; i++ {
 			currInp := input.RowView(i)
-			_, acts := n.ForwardSample(currInp)
-			outputs = append(outputs, acts.Out)
+			_, acts := n.Forward(currInp)
+			predictions = append(predictions, acts.Out)
 		}
-		_, totalOk := c.GetClassAccuracy(outputs, expected)
-		fmt.Printf("Epoch %d; %v out of %v\n", epoch, totalOk, numInputs)
+		// Get the total number of correctly classified items
+		_, totalOk := c.GetClassAccuracy(predictions, expected)
+		if (epoch % 100) == 0 {
+			fmt.Printf("Epoch %d; %v out of %v predictions correct\n",
+				epoch, totalOk, numInputs)
+		}
 	}
 }
 
 // Update updates input-to-hidden and hidden-to-output weights using
-// error gradients on those weights retrieved by backpropagation.
-// Updates are done by multiplying gradients by learning rate (Eta) and
+// error gradients on those weights retrieved by backpropagation. It also
+// updates the hidden and output layer biases.
+// Updates are performed as multiplying gradients by learning rate (Eta) and
 // subtracting the result from the actual weights.
 // A quick note on why we do it this way. The partial derivative of error with
 // respect to any specific weight tells us how quickly the error grows when the
 // weight grows. As we want the error to become smaller, we *subtract* the
 // derivative times the learning rate from the actual weight.
 func (n *NN) Update(input, expected *m.Vector) {
-	dErrdIH, dErrdHO, dErrdHB, dErrdOB := n.BackPropSample(input, expected)
-	etaIH := c.GetDenseApply(dErrdIH, func(val float64) float64 {
-		return val * n.Eta
+	δErrδIH, δErrδHO, δErrδHB, δErrδOB := n.BackProp(input, expected)
+	ηIH := c.GetDenseApply(δErrδIH, func(val float64) float64 {
+		return val * n.η
 	})
-	etaHO := c.GetDenseApply(dErrdHO, func(val float64) float64 {
-		return val * n.Eta
+	ηHO := c.GetDenseApply(δErrδHO, func(val float64) float64 {
+		return val * n.η
 	})
-	etaHB := c.GetVectorApply(dErrdHB, func(val float64) float64 {
-		return val * n.Eta
+	ηHB := c.GetVectorApply(δErrδHB, func(val float64) float64 {
+		return val * n.η
 	})
-	etaOB := c.GetVectorApply(dErrdOB, func(val float64) float64 {
-		return val * n.Eta
+	ηOB := c.GetVectorApply(δErrδOB, func(val float64) float64 {
+		return val * n.η
 	})
-	n.IH.Sub(n.IH, etaIH)
-	n.HO.Sub(n.HO, etaHO)
-	n.HB.SubVec(n.HB, etaHB)
-	n.OB.SubVec(n.OB, etaOB)
+	n.IH.Sub(n.IH, ηIH)
+	n.HO.Sub(n.HO, ηHO)
+	n.HB.SubVec(n.HB, ηHB)
+	n.OB.SubVec(n.OB, ηOB)
 }
 
-// BackPropSample performs a forward pass for the input vector, calculates the
-// error and returns:
-//	1. Error gradients on each of input-to-hidden weights (dErrdIH)
-//	2. Error gradients on each of hidden-to-output weights (dErrdHO)
-//	3. Error gradients on hidden layer biases (dErrdHB)
-// 	4. Error gradients on output layer biases (dErrdOB)
-func (n *NN) BackPropSample(input, expected *m.Vector) (
-	dErrdIH, dErrdHO *m.Dense, dErrdHB, dErrdOB *m.Vector) {
+// BackProp performs a forward pass for the input vector, calculates the error
+// and returns:
+//	1. Error gradients on each of input-to-hidden weights (δErrδIH)
+//	2. Error gradients on each of hidden-to-output weights (δErrδHO)
+//	3. Error gradients on hidden layer biases (δErrδHB)
+// 	4. Error gradients on output layer biases (δErrδOB)
+func (n *NN) BackProp(input, expected *m.Vector) (
+	δErrδIH, δErrδHO *m.Dense, δErrδHB, δErrδOB *m.Vector) {
 	// Get weighted sums and activations for all layers
-	sums, acts := n.ForwardSample(input)
+	sums, acts := n.Forward(input)
 	// Calculate error for each neuron in the output layer
 	outErrs := n.GetOutError(sums.Out, acts.Out, expected)
 	// Calculate error for each neuron in the hidden layer using output layer's
@@ -121,11 +134,11 @@ func (n *NN) BackPropSample(input, expected *m.Vector) (
 	// output layer). We could do this in a straightforward way like this:
 	//
 	// hoRows, hoCols := n.HO.Dims()
-	// dErrdHO = m.NewDense(hoRows, hoCols, nil)
+	// δErrδHO = m.NewDense(hoRows, hoCols, nil)
 	// for j := 0; j < hoRows; j++ {
 	// 	for k := 0; k < hoCols; k++ {
 	// 		grad := acts.Hid.At(k, 0) * outErrs.At(j, 0)
-	// 		dErrdHO.Set(j, k, grad)
+	// 		δErrδHO.Set(j, k, grad)
 	// 	}
 	// }
 	//
@@ -141,26 +154,26 @@ func (n *NN) BackPropSample(input, expected *m.Vector) (
 	// hidden-to-output weights by finding Outer(outErrs, acts.Hid) (which
 	// has the same dims as m.HO):
 	hoRows, hoCols := n.HO.Dims()
-	dErrdHO = m.NewDense(hoRows, hoCols, nil)
-	dErrdHO.Outer(1., outErrs, acts.Hid)
+	δErrδHO = m.NewDense(hoRows, hoCols, nil)
+	δErrδHO.Outer(1., outErrs, acts.Hid)
 	// And then we'll do the same for weights from input to hidden layer:
 	ihRows, ihCols := n.IH.Dims()
-	dErrdIH = m.NewDense(ihRows, ihCols, nil)
-	dErrdIH.Outer(1., hidErrs, acts.Inp)
+	δErrδIH = m.NewDense(ihRows, ihCols, nil)
+	δErrδIH.Outer(1., hidErrs, acts.Inp)
 	// Error gradients on hidden and output layer biases are just the errors
 	// on those layers
-	dErrdHB, dErrdOB = hidErrs, outErrs
+	δErrδHB, δErrδOB = hidErrs, outErrs
 	return
 }
 
-// ForwardSample returns weighted sums (before applying the activation
-// function) and activations (after applying the activation function) for each
-// neuron in all layers. Note that we treat the @input vector as input layer
-// activation (which is kind of natural) and don't save anything as
-// input layer's sums (mostly because those values are not used anywhere).
+// Forward returns weighted sums (before applying the activation function) and
+// activations (after applying the activation function) for each neuron in all
+// layers. Note that we treat the @input vector as input layer activation
+// (which is kind of natural) and don't save anything as input layer's sums
+// (mostly because those values are not used anywhere).
 // So, generally speaking it's just performing the forward pass and saving
 // the intermediate results (which will be used for backpropagation).
-func (n *NN) ForwardSample(input *m.Vector) (sums *Sums, acts *Acts) {
+func (n *NN) Forward(input *m.Vector) (sums *Sums, acts *Acts) {
 	// Same as getting the weighted sum of inputs for all hidden neurons
 	// plus the hidden bias
 	hidSums := c.GetAddVec(

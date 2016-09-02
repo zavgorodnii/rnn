@@ -1,6 +1,7 @@
-package baseNN
+package basicNN
 
 import (
+	"fmt"
 	"math/rand"
 	"rnn/common"
 )
@@ -11,12 +12,14 @@ func Test() {
 	var (
 		numEpochs = 3001
 		numInput  = 4
-		numHidden = 4
+		numHidden = 4 // May be changed to see how the network behaves
 		numOutput = 3
 	)
-	fmt.Println("Testing basic ")
+	fmt.Println("================================================")
+	fmt.Println("Testing basic feed-forward NN on Iris dataset:")
+	fmt.Println("================================================")
 	args := &Args{
-		Eta:    0.001,
+		Eta:    0.001, // May be changed to see how the network behaves
 		NumInp: numInput,
 		NumHid: numHidden,
 		NumOut: numOutput,
