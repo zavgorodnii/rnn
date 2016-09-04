@@ -94,17 +94,17 @@ func (n *NN) RunEpochs(numEpochs int, input, expected *m.Dense) {
 // weight grows. As we want the error to become smaller, we *subtract* the
 // derivative times the learning rate from the actual weight.
 func (n *NN) Update(input, expected *m.Vector) {
-	∂Err∂IH, ∂Err∂HO, ∂Err∂HB, ∂Err∂OB := n.BackProp(input, expected)
-	ηIH := c.GetDenseApply(∂Err∂IH, func(val float64) float64 {
+	𝑑Err𝑑IH, 𝑑Err𝑑HO, 𝑑Err𝑑HB, 𝑑Err𝑑OB := n.BackProp(input, expected)
+	ηIH := c.GetDenseApply(𝑑Err𝑑IH, func(val float64) float64 {
 		return val * n.η
 	})
-	ηHO := c.GetDenseApply(∂Err∂HO, func(val float64) float64 {
+	ηHO := c.GetDenseApply(𝑑Err𝑑HO, func(val float64) float64 {
 		return val * n.η
 	})
-	ηHB := c.GetVectorApply(∂Err∂HB, func(val float64) float64 {
+	ηHB := c.GetVectorApply(𝑑Err𝑑HB, func(val float64) float64 {
 		return val * n.η
 	})
-	ηOB := c.GetVectorApply(∂Err∂OB, func(val float64) float64 {
+	ηOB := c.GetVectorApply(𝑑Err𝑑OB, func(val float64) float64 {
 		return val * n.η
 	})
 	n.IH.Sub(n.IH, ηIH)
@@ -115,12 +115,12 @@ func (n *NN) Update(input, expected *m.Vector) {
 
 // BackProp performs a forward pass for the input vector, calculates the error
 // and returns:
-//	1. Error gradients on each of input-to-hidden weights (∂Err∂IH)
-//	2. Error gradients on each of hidden-to-output weights (∂Err∂HO)
-//	3. Error gradients on hidden layer biases (∂Err∂HB)
-// 	4. Error gradients on output layer biases (∂Err∂OB)
+//	1. Error gradients on each of input-to-hidden weights (𝑑Err𝑑IH)
+//	2. Error gradients on each of hidden-to-output weights (𝑑Err𝑑HO)
+//	3. Error gradients on hidden layer biases (𝑑Err𝑑HB)
+// 	4. Error gradients on output layer biases (𝑑Err𝑑OB)
 func (n *NN) BackProp(input, expected *m.Vector) (
-	∂Err∂IH, ∂Err∂HO *m.Dense, ∂Err∂HB, ∂Err∂OB *m.Vector) {
+	𝑑Err𝑑IH, 𝑑Err𝑑HO *m.Dense, 𝑑Err𝑑HB, 𝑑Err𝑑OB *m.Vector) {
 	// Get weighted sums and activations for all layers
 	sums, acts := n.Forward(input)
 	// Calculate error for each neuron in the output layer
@@ -134,11 +134,11 @@ func (n *NN) BackProp(input, expected *m.Vector) (
 	// output layer). We could do this in a straightforward way like this:
 	//
 	// hoRows, hoCols := n.HO.Dims()
-	// ∂Err∂HO = m.NewDense(hoRows, hoCols, nil)
+	// 𝑑Err𝑑HO = m.NewDense(hoRows, hoCols, nil)
 	// for j := 0; j < hoRows; j++ {
 	// 	for k := 0; k < hoCols; k++ {
 	// 		grad := acts.Hid.At(k, 0) * outErrs.At(j, 0)
-	// 		∂Err∂HO.Set(j, k, grad)
+	// 		𝑑Err𝑑HO.Set(j, k, grad)
 	// 	}
 	// }
 	//
@@ -154,15 +154,15 @@ func (n *NN) BackProp(input, expected *m.Vector) (
 	// hidden-to-output weights by finding Outer(outErrs, acts.Hid) (which
 	// has the same dims as m.HO):
 	hoRows, hoCols := n.HO.Dims()
-	∂Err∂HO = m.NewDense(hoRows, hoCols, nil)
-	∂Err∂HO.Outer(1., outErrs, acts.Hid)
+	𝑑Err𝑑HO = m.NewDense(hoRows, hoCols, nil)
+	𝑑Err𝑑HO.Outer(1., outErrs, acts.Hid)
 	// And then we'll do the same for weights from input to hidden layer:
 	ihRows, ihCols := n.IH.Dims()
-	∂Err∂IH = m.NewDense(ihRows, ihCols, nil)
-	∂Err∂IH.Outer(1., hidErrs, acts.Inp)
+	𝑑Err𝑑IH = m.NewDense(ihRows, ihCols, nil)
+	𝑑Err𝑑IH.Outer(1., hidErrs, acts.Inp)
 	// Error gradients on hidden and output layer biases are just the errors
 	// on those layers
-	∂Err∂HB, ∂Err∂OB = hidErrs, outErrs
+	𝑑Err𝑑HB, 𝑑Err𝑑OB = hidErrs, outErrs
 	return
 }
 
