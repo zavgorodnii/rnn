@@ -42,6 +42,14 @@ func GetSubVec(v1, v2 *mat64.Vector) *mat64.Vector {
 	return out
 }
 
+// GetOuterVec wraps mat64.Outer and returns a new dense matrix.
+func GetOuterVec(v1, v2 *mat64.Vector) *mat64.Dense {
+	r, c := v1.Len(), v2.Len()
+	out := mat64.NewDense(r, c, nil)
+	out.Outer(1., v1, v2)
+	return out
+}
+
 // GetDenseApply wraps mat64.Apply for dense matrices and returns a new vector.
 // it slightly changes the API (see the callback signature).
 func GetDenseApply(m *mat64.Dense, cb func(float64) float64) *mat64.Dense {

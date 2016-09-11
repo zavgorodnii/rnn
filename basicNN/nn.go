@@ -153,13 +153,9 @@ func (n *NN) BackProp(input, expected *m.Vector) (
 	// So we'll use this shortcut to calculate gradients of output error on
 	// hidden-to-output weights by finding Outer(outErrs, acts.Hid) (which
 	// has the same dims as m.HO):
-	hoRows, hoCols := n.HO.Dims()
-	𝑑Err𝑑HO = m.NewDense(hoRows, hoCols, nil)
-	𝑑Err𝑑HO.Outer(1., outErrs, acts.Hid)
+	𝑑Err𝑑HO = c.GetOuterVec(outErrs, acts.Hid)
 	// And then we'll do the same for weights from input to hidden layer:
-	ihRows, ihCols := n.IH.Dims()
-	𝑑Err𝑑IH = m.NewDense(ihRows, ihCols, nil)
-	𝑑Err𝑑IH.Outer(1., hidErrs, acts.Inp)
+	𝑑Err𝑑IH = c.GetOuterVec(hidErrs, acts.Inp)
 	// Error gradients on hidden and output layer biases are just the errors
 	// on those layers
 	𝑑Err𝑑HB, 𝑑Err𝑑OB = hidErrs, outErrs
