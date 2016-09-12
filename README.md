@@ -5,14 +5,14 @@ Source code for a [series](http://chisquared.org) of posts about recurrent neura
 You'll need to install the linear algebra library for Go:
 
 ```
-go get github.com/gonum/matrix/mat64
+$ go get github.com/gonum/matrix/mat64
 
 ```
 
 You can execute any of the examples in the blog like this:
 
 ```
-go run main.go [--basicNN | --Elman-- | --Jordan | --LSTM]
+$ go run main.go [--basicNN | --Elman-- | --Jordan | --LSTM]
 
 ```
 
