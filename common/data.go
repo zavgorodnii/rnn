@@ -54,6 +54,10 @@ func LoadFromCSV(path string, vectorLen int) (out *mat64.Dense) {
 	return out
 }
 
+// GetAbstractTimeSeries creates a time-series dataset with a certain pattern:
+// the input is an "angle" of ones, and the expected output is the same angle
+// shifted by one position to the right. A recurrent NN should be able to
+// learn this pattern.
 func GetAbstractTimeSeries() (input, expected *mat64.Dense) {
 	input = mat64.NewDense(6, 4, nil)
 	input.SetRow(0, []float64{1., 0, 0, 0})

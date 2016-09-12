@@ -54,15 +54,16 @@ func NewRNN(args *Args) *RNN {
 	return out
 }
 
-// RunEpochs updates NN's weights for @input @numEpochs times.
+// RunEpochs executes BPTT algorithm for @input @numEpochs times.
 func (n *RNN) RunEpochs(numEpochs int, input, expected *m.Dense) {
 	// For each epoch
 	for epoch := 0; epoch < numEpochs; epoch++ {
-		// For each input
-		n.BackProp(input, expected)
+		// For each input do the BPTT algorithm
+		n.BPTT(input, expected)
 		_, acts := n.Forward(input)
+		// Print only the last epoch results
 		if epoch == numEpochs-1 {
-			for _, prediction := range acts {
+			for idx, prediction := range acts {
 				for i := 0; i < prediction.Out.Len(); i++ {
 					if prediction.Out.At(i, 0) >= 0.5 {
 						prediction.Out.SetVec(i, 1.)
@@ -70,58 +71,83 @@ func (n *RNN) RunEpochs(numEpochs int, input, expected *m.Dense) {
 						prediction.Out.SetVec(i, 0.)
 					}
 				}
-				fmt.Println(prediction.Out)
+				// Some pretty printing (I know, this looks awful)
+				fmt.Printf("Input: ")
+				c.PrintVectorStripSub(input.RowView(idx), 0., ".")
+				fmt.Printf("\t")
+				fmt.Printf("Expected: ")
+				c.PrintVectorStripSub(expected.RowView(idx), 0., ".")
+				fmt.Printf("\t")
+				fmt.Printf("Predicted: ")
+				c.PrintVectorStripSub(prediction.Out, 0., ".")
+				fmt.Printf("\n")
 			}
 		}
 	}
 }
 
-func (n *RNN) BackProp(input, expected *m.Dense) (
+// BPTT executes the Backpropagation Through Time algorithm to learn the
+// network's weight. As BPTT is a variation of standard Backpropagation, it
+// might be useful to look at basicNN code and look for similarities.
+// Note that we don't have a separate Update() method; all weights are updated
+// "on the go".
+func (n *RNN) BPTT(input, expected *m.Dense) (
 	ZErrZIH, ZErrZHH, ZErrZHO *m.Dense) {
-	var (
-		numSteps, _ = input.Dims()
-		sums, acts  = n.Forward(input) // Outputs and hidden layers
-	)
-	// ZErrZIH = m.NewDense(n.NumHid, n.NumInp, nil)
-	// ZErrZHH = m.NewDense(n.NumHid, n.NumHid, nil)
-	// ZErrZHO = m.NewDense(n.NumOut, n.NumHid, nil)
+	numSteps, _ := input.Dims()
+	// Forward pass: get sums and activations for each layer for @numSteps
+	// samples. See n.Forward() for details.
+	sums, acts := n.Forward(input)
+	// For each sample @t in the @input
 	for t := 0; t < numSteps; t++ {
-		// Calculate output layer error for sample t
+		// We start just as in basicNN. Calculate output layer error for @t
 		outError := n.GetOutError(acts[t].Out, sums[t].Out, expected.RowView(t))
-		// Calculate derivatives for weights in HO
+		// Calculate derivatives for weights in HO using this output layer
 		ZErrZHO := c.GetOuterVec(outError, acts[t].Hid)
-		// Calculate the changes for weights using the moment
+		// Calculate the changes for weights based on the derivatives from
+		// previous step (this was done in a separate method in basicNN)
 		ηHO := c.GetDenseApply(ZErrZHO, func(val float64) float64 {
 			return val * n.η
 		})
 		// Update HO weights
 		n.HO.Sub(n.HO, ηHO)
-		// Calculate initial hidden layer errors which will be used as
-		// "previous" errors for the unfolding part
-		prevHidErr := n.GetError(outError, sums[t].Hid, n.HO)
+		// Like in basicNN, we calculate hidden layer errors by propagating
+		// output layer errors. These errors will be used as the starting point
+		// for the recursive calculation of hidden layer errors in the
+		// unfolding procedure.
+		currHidErr := n.GetError(outError, sums[t].Hid, n.HO)
+		// Start unfolding the network @n.Depth steps back. This is a "moving
+		// backwards" procedure, and @z is the number of steps back through the
+		// unfolded network
 		for z := 0; z < n.Depth && t-z > 0; z++ {
-			currHidErr := n.GetError(prevHidErr, sums[t-z-1].Hid, n.HH)
-			// Calculate derivatives for weights in IH
+			// Now we update the IH weights just as we did in basicNN. First we
+			// calculate derivatives for weights in IH
 			ZErrZIH := c.GetOuterVec(currHidErr, acts[t-z].Inp)
+			// Then we find the momentum-driven changes
 			ηIH := c.GetDenseApply(ZErrZIH, func(val float64) float64 {
 				return val * n.η
 			})
-			// Update HO weights
+			// Finally we update IH weights
 			n.IH.Sub(n.IH, ηIH)
-			// Calculate derivatives for weights in IH
+			// Now the same for HH weights from (t-z-1) to (t-z)
 			ZErrZHH := c.GetOuterVec(currHidErr, acts[t-z-1].Hid)
 			ηHH := c.GetDenseApply(ZErrZHH, func(val float64) float64 {
 				return val * n.η
 			})
-			// Update HO weights
 			n.HH.Sub(n.HH, ηHH)
-			// Update the "previous" hidden layer errors
-			prevHidErr = currHidErr
+			// In the next iteration we need hidden errors for layer (t-z-1).
+			// We calculate them by propagating current (t-z) hidden errors
+			// to (t-z-1) via HH weights.
+			// When z is 0, @prevHidErr is just the "normal" basicNN-style
+			// hidden layer error propagated from the output layer (because we
+			// need something to start with).
+			currHidErr = n.GetError(currHidErr, sums[t-z-1].Hid, n.HH)
 		}
 	}
 	return
 }
 
+// Forward accumulates sums and activations for each layer for each training
+// sample.
 func (n *RNN) Forward(input *m.Dense) (sums []*Sums, acts []*Acts) {
 	numSteps, _ := input.Dims()
 	// Allocate space for all weighted sums that we get while propagating
