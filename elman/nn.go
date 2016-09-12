@@ -58,38 +58,6 @@ func NewElman(args *Args) *Elman {
 	return out
 }
 
-// RunEpochs executes BPTT algorithm for @input @numEpochs times.
-func (n *Elman) RunEpochs(numEpochs int, input, expected *m.Dense) {
-	// For each epoch
-	for epoch := 0; epoch < numEpochs; epoch++ {
-		// For each input do the BPTT algorithm
-		n.BPTT(input, expected)
-		_, acts := n.Forward(input)
-		// Print only the last epoch results
-		if epoch == numEpochs-1 {
-			for idx, prediction := range acts {
-				for i := 0; i < prediction.Out.Len(); i++ {
-					if prediction.Out.At(i, 0) >= 0.5 {
-						prediction.Out.SetVec(i, 1.)
-					} else {
-						prediction.Out.SetVec(i, 0.)
-					}
-				}
-				// Some pretty printing (I know, this looks awful)
-				fmt.Printf("Input: ")
-				c.PrintVectorStripSub(input.RowView(idx), 0., ".")
-				fmt.Printf("\t")
-				fmt.Printf("Expected: ")
-				c.PrintVectorStripSub(expected.RowView(idx), 0., ".")
-				fmt.Printf("\t")
-				fmt.Printf("Predicted: ")
-				c.PrintVectorStripSub(prediction.Out, 0., ".")
-				fmt.Printf("\n")
-			}
-		}
-	}
-}
-
 // BPTT executes the Backpropagation Through Time algorithm to learn the
 // network's weight. As BPTT is a variation of standard Backpropagation, it
 // might be useful to look at basicNN code and look for similarities.
@@ -168,18 +136,18 @@ func (n *Elman) Forward(input *m.Dense) (sums []*Sums, acts []*Acts) {
 	// create it with a zero magnitude t-1 hidden state and the first (initial)
 	// training sample
 	acts[0].Inp = input.RowView(0)
-	sums[0].Hid, acts[0].Hid = n.getHidden(
+	sums[0].Hid, acts[0].Hid = n.GetHidden(
 		m.NewVector(n.NumHid, nil), acts[0].Inp,
 	)
-	sums[0].Out, acts[0].Out = n.getOutput(acts[0].Hid)
+	sums[0].Out, acts[0].Out = n.GetOutput(acts[0].Hid)
 	// For each time step
 	for t := 1; t < numSteps; t++ {
 		currSample := input.RowView(t)
 		prevHidden := acts[t-1].Hid
 		acts[t].Inp = currSample
-		sums[t].Hid, acts[t].Hid = n.getHidden(prevHidden, currSample)
+		sums[t].Hid, acts[t].Hid = n.GetHidden(prevHidden, currSample)
 		currHidden := acts[t].Hid
-		sums[t].Out, acts[t].Out = n.getOutput(currHidden)
+		sums[t].Out, acts[t].Out = n.GetOutput(currHidden)
 	}
 	return
 }
@@ -212,7 +180,7 @@ func (n *Elman) GetError(prevErrs, currSums *m.Vector, w *m.Dense) *m.Vector {
 //		getting a weighted sum of inputs for each hidden neuron);
 //  3.  Sums the results from steps 1, 2 and applies activation function
 //		(hyperbolic tanhent in this case).
-func (n *Elman) getHidden(prevHidden, sample *m.Vector) (sums, acts *m.Vector) {
+func (n *Elman) GetHidden(prevHidden, sample *m.Vector) (sums, acts *m.Vector) {
 	fromInput := c.GetMulVec(n.IH, sample)
 	fromHidden := c.GetMulVec(n.HH, prevHidden)
 	sums = c.GetAddVec(fromInput, fromHidden)
@@ -222,10 +190,45 @@ func (n *Elman) getHidden(prevHidden, sample *m.Vector) (sums, acts *m.Vector) {
 
 // getOutput just multiplies hiddenToHidden matrix by previous hidden layer
 // (same as getting a weighted sum of inputs for each output neuron).
-func (n *Elman) getOutput(currHidden *m.Vector) (sums, acts *m.Vector) {
+func (n *Elman) GetOutput(currHidden *m.Vector) (sums, acts *m.Vector) {
 	sums = c.GetMulVec(n.HO, currHidden)
 	acts = c.GetVectorSigmoid(sums)
 	return
+}
+
+// RunEpochs executes BPTT algorithm for @input @numEpochs times.
+func (n *Elman) RunEpochs(numEpochs int, input, expected *m.Dense) {
+	// For each epoch
+	for epoch := 0; epoch < numEpochs; epoch++ {
+		// For each input do the BPTT algorithm
+		n.BPTT(input, expected)
+		_, acts := n.Forward(input)
+		// Print only the last epoch results
+		if (epoch % 1000) == 0 {
+			fmt.Printf("Epoch: %d\n", epoch)
+			fmt.Println("_______________________________________")
+			for idx, prediction := range acts {
+				for i := 0; i < prediction.Out.Len(); i++ {
+					if prediction.Out.At(i, 0) >= 0.5 {
+						prediction.Out.SetVec(i, 1.)
+					} else {
+						prediction.Out.SetVec(i, 0.)
+					}
+				}
+				// Some pretty printing (I know, this looks awful)
+				fmt.Printf("Input: ")
+				c.PrintVectorStripSub(input.RowView(idx), 0., ".")
+				fmt.Printf("\t")
+				fmt.Printf("Expected: ")
+				c.PrintVectorStripSub(expected.RowView(idx), 0., ".")
+				fmt.Printf("\t")
+				fmt.Printf("Predicted: ")
+				c.PrintVectorStripSub(prediction.Out, 0., ".")
+				fmt.Printf("\n")
+			}
+			fmt.Println()
+		}
+	}
 }
 
 // Sums is used to keep weighted sums received by each neuron of output and

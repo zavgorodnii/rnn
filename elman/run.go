@@ -12,7 +12,7 @@ import (
 func Test() {
 	rand.Seed(0)
 	var (
-		numEpochs = 5000
+		numEpochs = 4001
 		numInput  = 4
 		numHidden = 6 // May be changed to see how the network behaves
 		numOutput = 4

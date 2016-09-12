@@ -23,11 +23,48 @@ $ go run main.go --Elman
 ====================================================
 Testing basic Vanilla RNN on sample series dataset:
 ====================================================
-Expected: .     1.0     .       .               Predicted: .    1.0     .       .
-Expected: .     .       1.0     .               Predicted: .    .       1.0     .
-Expected: .     .       .       1.0             Predicted: .    .       .       1.0
-Expected: .     .       1.0     .               Predicted: .    .       1.0     .
-Expected: .     1.0     .       .               Predicted: .    1.0     .       .
-Expected: 1.0   .       .       .               Predicted: 1.0  .       .       .
+Epoch:  0
+____________________________________
+Input:  1  .  .  .  Expected:  .  1  .  .  Predicted:  1  .  .  1
+Input:  .  1  .  .  Expected:  .  .  1  .  Predicted:  1  .  .  1
+Input:  .  .  1  .  Expected:  .  .  .  1  Predicted:  1  .  .  1
+Input:  .  .  .  1  Expected:  .  .  1  .  Predicted:  1  .  .  1
+Input:  .  .  1  .  Expected:  .  1  .  .  Predicted:  1  .  .  1
+Input:  .  1  .  .  Expected:  1  .  .  .  Predicted:  1  .  .  1
 
+Epoch:  1000
+____________________________________
+Input:  1  .  .  .  Expected:  .  1  .  .  Predicted:  .  1  .  .
+Input:  .  1  .  .  Expected:  .  .  1  .  Predicted:  .  .  .  .
+Input:  .  .  1  .  Expected:  .  .  .  1  Predicted:  .  1  .  .
+Input:  .  .  .  1  Expected:  .  .  1  .  Predicted:  .  .  1  .
+Input:  .  .  1  .  Expected:  .  1  .  .  Predicted:  .  1  .  .
+Input:  .  1  .  .  Expected:  1  .  .  .  Predicted:  .  .  1  .
+
+Epoch:  2000
+____________________________________
+Input:  1  .  .  .  Expected:  .  1  .  .  Predicted:  .  1  .  .
+Input:  .  1  .  .  Expected:  .  .  1  .  Predicted:  .  .  1  .
+Input:  .  .  1  .  Expected:  .  .  .  1  Predicted:  .  1  .  .
+Input:  .  .  .  1  Expected:  .  .  1  .  Predicted:  .  .  1  .
+Input:  .  .  1  .  Expected:  .  1  .  .  Predicted:  .  1  .  .
+Input:  .  1  .  .  Expected:  1  .  .  .  Predicted:  .  .  1  .
+
+Epoch:  3000
+____________________________________
+Input:  1  .  .  .  Expected:  .  1  .  .  Predicted:  .  1  .  .
+Input:  .  1  .  .  Expected:  .  .  1  .  Predicted:  .  .  1  .
+Input:  .  .  1  .  Expected:  .  .  .  1  Predicted:  .  .  .  .
+Input:  .  .  .  1  Expected:  .  .  1  .  Predicted:  .  .  1  .
+Input:  .  .  1  .  Expected:  .  1  .  .  Predicted:  .  1  .  .
+Input:  .  1  .  .  Expected:  1  .  .  .  Predicted:  .  .  1  .
+
+Epoch:  4000
+____________________________________
+Input:  1  .  .  .  Expected:  .  1  .  .  Predicted:  .  1  .  .
+Input:  .  1  .  .  Expected:  .  .  1  .  Predicted:  .  .  1  .
+Input:  .  .  1  .  Expected:  .  .  .  1  Predicted:  .  .  .  1
+Input:  .  .  .  1  Expected:  .  .  1  .  Predicted:  .  .  1  .
+Input:  .  .  1  .  Expected:  .  1  .  .  Predicted:  .  1  .  .
+Input:  .  1  .  .  Expected:  1  .  .  .  Predicted:  1  .  .  .
 ```

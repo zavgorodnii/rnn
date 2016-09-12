@@ -56,34 +56,6 @@ func NewNN(args *Args) *NN {
 	return out
 }
 
-// RunEpochs updates NN's weights for @input @numEpochs times.
-func (n *NN) RunEpochs(numEpochs int, input, expected *m.Dense) {
-	numInputs, _ := input.Dims()
-	// For each epoch
-	for epoch := 0; epoch < numEpochs; epoch++ {
-		// For each input
-		for i := 0; i < numInputs; i++ {
-			currInp := input.RowView(i)
-			currExp := expected.RowView(i)
-			// update the weights
-			n.Update(currInp, currExp)
-		}
-		// Gather predictions
-		predictions := []*m.Vector{}
-		for i := 0; i < numInputs; i++ {
-			currInp := input.RowView(i)
-			_, acts := n.Forward(currInp)
-			predictions = append(predictions, acts.Out)
-		}
-		// Get the total number of correctly classified items
-		_, totalOk := c.GetClassAccuracy(predictions, expected)
-		if (epoch % 100) == 0 {
-			fmt.Printf("Epoch %d; %v out of %v predictions correct\n",
-				epoch, totalOk, numInputs)
-		}
-	}
-}
-
 // Update updates input-to-hidden and hidden-to-output weights using
 // error gradients on those weights retrieved by backpropagation. It also
 // updates the hidden and output layer biases.
@@ -217,6 +189,34 @@ func (n *NN) GetError(prevErrs, currSums *m.Vector, w *m.Dense) *m.Vector {
 	propagated := c.GetMulVec(wT, prevErrs)
 	return c.GetMulElemVec(propagated,
 		c.GetVectorSigmoidPrime(currSums))
+}
+
+// RunEpochs updates NN's weights for @input @numEpochs times.
+func (n *NN) RunEpochs(numEpochs int, input, expected *m.Dense) {
+	numInputs, _ := input.Dims()
+	// For each epoch
+	for epoch := 0; epoch < numEpochs; epoch++ {
+		// For each input
+		for i := 0; i < numInputs; i++ {
+			currInp := input.RowView(i)
+			currExp := expected.RowView(i)
+			// update the weights
+			n.Update(currInp, currExp)
+		}
+		// Gather predictions
+		predictions := []*m.Vector{}
+		for i := 0; i < numInputs; i++ {
+			currInp := input.RowView(i)
+			_, acts := n.Forward(currInp)
+			predictions = append(predictions, acts.Out)
+		}
+		// Get the total number of correctly classified items
+		_, totalOk := c.GetClassAccuracy(predictions, expected)
+		if (epoch % 100) == 0 {
+			fmt.Printf("Epoch %d; %v out of %v predictions correct\n",
+				epoch, totalOk, numInputs)
+		}
+	}
 }
 
 // Sums is used to keep weighted sums received by each neuron of output and
