@@ -59,87 +59,65 @@ func (n *RNN) RunEpochs(numEpochs int, input, expected *m.Dense) {
 	// For each epoch
 	for epoch := 0; epoch < numEpochs; epoch++ {
 		// For each input
-		n.Update(input, expected)
+		n.BackProp(input, expected)
 		_, acts := n.Forward(input)
 		if epoch == numEpochs-1 {
 			for _, prediction := range acts {
 				for i := 0; i < prediction.Out.Len(); i++ {
 					if prediction.Out.At(i, 0) >= 0.5 {
-						prediction.Out.SetVec(i, 0.)
-					} else {
 						prediction.Out.SetVec(i, 1.)
+					} else {
+						prediction.Out.SetVec(i, 0.)
 					}
 				}
 				fmt.Println(prediction.Out)
 			}
 		}
-		// fmt.Println("=============================================")
-	}
-}
-
-func (n *RNN) Update(input, expected *m.Dense) {
-	numSteps, _ := input.Dims()
-	ZErrZIH, ZErrZHH, ZErrZHO := n.BackProp(input, expected)
-	for t := 0; t < numSteps; t++ {
-		var (
-			tZErrZHO = ZErrZHO[t]
-			tZErrZHH = ZErrZHH[t]
-			tZErrZIH = ZErrZIH[t]
-		)
-		ηIH := c.GetDenseApply(tZErrZIH, func(val float64) float64 {
-			return val * n.η
-		})
-		ηHH := c.GetDenseApply(tZErrZHH, func(val float64) float64 {
-			return val * n.η
-		})
-		ηHO := c.GetDenseApply(tZErrZHO, func(val float64) float64 {
-			return val * n.η
-		})
-		n.IH.Sub(n.IH, ηIH)
-		n.HH.Sub(n.HH, ηHH)
-		n.HO.Sub(n.HO, ηHO)
 	}
 }
 
 func (n *RNN) BackProp(input, expected *m.Dense) (
-	ZErrZIH, ZErrZHH, ZErrZHO []*m.Dense) {
+	ZErrZIH, ZErrZHH, ZErrZHO *m.Dense) {
 	var (
 		numSteps, _ = input.Dims()
 		sums, acts  = n.Forward(input) // Outputs and hidden layers
 	)
-	ZErrZIH = make([]*m.Dense, numSteps)
-	ZErrZHH = make([]*m.Dense, numSteps)
-	ZErrZHO = make([]*m.Dense, numSteps)
-	// for t := (numSteps - 1); t >= 0; t-- {
+	// ZErrZIH = m.NewDense(n.NumHid, n.NumInp, nil)
+	// ZErrZHH = m.NewDense(n.NumHid, n.NumHid, nil)
+	// ZErrZHO = m.NewDense(n.NumOut, n.NumHid, nil)
 	for t := 0; t < numSteps; t++ {
-		// Deal with the output layer for current sample
-		tExpected := expected.RowView(t)
-		tOutErrs := n.GetOutError(sums[t].Out, acts[t].Out, tExpected)
-		tZErrZHO := c.GetOuterVec(tOutErrs, acts[t].Hid)
-		ZErrZHO[t] = tZErrZHO
-		// Create accumulated derivatives for the IH and HH weights
-		tZErrZIH := m.NewDense(n.NumHid, n.NumInp, nil)
-		tZErrZHH := m.NewDense(n.NumHid, n.NumHid, nil)
-		// Start accumulating the derivatives using @n.Depth-sized memory
-		for memT := t; memT > c.MaxInt(0, t-n.Depth); memT-- {
-			// Deal with IH weights. First get the expected output at tT
-			memExpected := expected.RowView(t)
-			// Calculate the output error at tT
-			memOutErrs := n.GetOutError(sums[t].Out, acts[t].Out, memExpected)
-			// Propagate the error to the hidden layer
-			memHidErrs := n.GetError(memOutErrs, sums[memT].Hid, n.HO)
-			// Calculate IH derivatives at tT and add them to the global
-			// derivatives
-			memZErrZIH := c.GetOuterVec(memHidErrs, acts[memT].Inp)
-			tZErrZIH.Add(tZErrZIH, memZErrZIH)
-			// Do the same for HH derivatives (yes, we're using memHidErrs here
-			// too)
-			memZErrZHH := c.GetOuterVec(memHidErrs, acts[memT].Hid)
-			tZErrZHH.Add(tZErrZHH, memZErrZHH)
+		// Calculate output layer error for sample t
+		outError := n.GetOutError(acts[t].Out, sums[t].Out, expected.RowView(t))
+		// Calculate derivatives for weights in HO
+		ZErrZHO := c.GetOuterVec(outError, acts[t].Hid)
+		// Calculate the changes for weights using the moment
+		ηHO := c.GetDenseApply(ZErrZHO, func(val float64) float64 {
+			return val * n.η
+		})
+		// Update HO weights
+		n.HO.Sub(n.HO, ηHO)
+		// Calculate initial hidden layer errors which will be used as
+		// "previous" errors for the unfolding part
+		prevHidErr := n.GetError(outError, sums[t].Hid, n.HO)
+		for z := 0; z < n.Depth && t-z > 0; z++ {
+			currHidErr := n.GetError(prevHidErr, sums[t-z-1].Hid, n.HH)
+			// Calculate derivatives for weights in IH
+			ZErrZIH := c.GetOuterVec(currHidErr, acts[t-z].Inp)
+			ηIH := c.GetDenseApply(ZErrZIH, func(val float64) float64 {
+				return val * n.η
+			})
+			// Update HO weights
+			n.IH.Sub(n.IH, ηIH)
+			// Calculate derivatives for weights in IH
+			ZErrZHH := c.GetOuterVec(currHidErr, acts[t-z-1].Hid)
+			ηHH := c.GetDenseApply(ZErrZHH, func(val float64) float64 {
+				return val * n.η
+			})
+			// Update HO weights
+			n.HH.Sub(n.HH, ηHH)
+			// Update the "previous" hidden layer errors
+			prevHidErr = currHidErr
 		}
-		ZErrZHO[t] = tZErrZHO
-		ZErrZHH[t] = tZErrZHH
-		ZErrZIH[t] = tZErrZIH
 	}
 	return
 }

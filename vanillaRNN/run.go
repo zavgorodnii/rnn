@@ -9,16 +9,16 @@ import (
 func Test() {
 	rand.Seed(0)
 	var (
-		numEpochs = 100000
+		numEpochs = 200000
 		numInput  = 4
-		numHidden = 3 // May be changed to see how the network behaves
+		numHidden = 5 // May be changed to see how the network behaves
 		numOutput = 4
 	)
 	fmt.Println("====================================================")
 	fmt.Println("Testing basic Vanilla RNN on sample series dataset:")
 	fmt.Println("====================================================")
 	args := &Args{
-		Eta:    0.001, // May be changed to see how the network behaves
+		Eta:    0.01, // May be changed to see how the network behaves
 		NumInp: numInput,
 		NumHid: numHidden,
 		NumOut: numOutput,
