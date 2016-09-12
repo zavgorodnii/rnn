@@ -25,6 +25,6 @@ func main() {
 }
 
 func printUsage() {
-	modes := "--basicNN | --Elman-- | --Jordan | --LSTM"
+	modes := "[--basicNN | --Elman-- | --Jordan | --LSTM]"
 	fmt.Printf("Please provide the training mode: %s\n", modes)
 }
