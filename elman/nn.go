@@ -1,4 +1,4 @@
-package vanillaRNN
+package elman
 
 import (
 	"fmt"
@@ -8,7 +8,7 @@ import (
 	m "github.com/gonum/matrix/mat64"
 )
 
-// Args holds names parameters to the NewRNN() constructor.
+// Args holds names parameters to the NewElman() constructor.
 type Args struct {
 	Eta    float64
 	NumInp int
@@ -17,22 +17,26 @@ type Args struct {
 	Depth  int
 }
 
-// RNN is a vanilla Recursive Neuron Network. All fields are exported for
-// easier inspection.
-type RNN struct {
-	η      float64
+// Elman is a simple Recursive Neuron Network which has recurrent connections
+// from hidden layer neurons at time step (t-1) to hidden layer neurons at time
+// step (t). We use this simplified model (without the possibility to add
+// arbitrary number of hidden layers) to reduce the number of obscure indices
+// and to use only named entities. We also use no biases (again, for
+// simplicity).
+type Elman struct {
 	NumInp int
 	NumHid int
 	NumOut int
-	Depth  int
-	IH     *m.Dense
-	HH     *m.Dense
-	HO     *m.Dense
+	η      float64  // Learning rate
+	Depth  int      // Number of steps down the unfolded network
+	IH     *m.Dense // Weights from input to hidden layer
+	HH     *m.Dense // Weights from hidden to hidden layer
+	HO     *m.Dense // Weights from hidden to output layer
 }
 
-// NewRNN is a constructor for SimpleRNN. Initializes weight matrices.
-func NewRNN(args *Args) *RNN {
-	out := &RNN{
+// NewElman is a constructor for SimpleElman. Initializes weight matrices.
+func NewElman(args *Args) *Elman {
+	out := &Elman{
 		η:      args.Eta,
 		NumInp: args.NumInp,
 		NumHid: args.NumHid,
@@ -55,7 +59,7 @@ func NewRNN(args *Args) *RNN {
 }
 
 // RunEpochs executes BPTT algorithm for @input @numEpochs times.
-func (n *RNN) RunEpochs(numEpochs int, input, expected *m.Dense) {
+func (n *Elman) RunEpochs(numEpochs int, input, expected *m.Dense) {
 	// For each epoch
 	for epoch := 0; epoch < numEpochs; epoch++ {
 		// For each input do the BPTT algorithm
@@ -91,8 +95,8 @@ func (n *RNN) RunEpochs(numEpochs int, input, expected *m.Dense) {
 // might be useful to look at basicNN code and look for similarities.
 // Note that we don't have a separate Update() method; all weights are updated
 // "on the go".
-func (n *RNN) BPTT(input, expected *m.Dense) (
-	ZErrZIH, ZErrZHH, ZErrZHO *m.Dense) {
+func (n *Elman) BPTT(input, expected *m.Dense) (
+	dErrdIH, dErrdHH, dErrdHO *m.Dense) {
 	numSteps, _ := input.Dims()
 	// Forward pass: get sums and activations for each layer for @numSteps
 	// samples. See n.Forward() for details.
@@ -102,10 +106,10 @@ func (n *RNN) BPTT(input, expected *m.Dense) (
 		// We start just as in basicNN. Calculate output layer error for @t
 		outError := n.GetOutError(acts[t].Out, sums[t].Out, expected.RowView(t))
 		// Calculate derivatives for weights in HO using this output layer
-		ZErrZHO := c.GetOuterVec(outError, acts[t].Hid)
+		dErrdHO := c.GetOuterVec(outError, acts[t].Hid)
 		// Calculate the changes for weights based on the derivatives from
 		// previous step (this was done in a separate method in basicNN)
-		ηHO := c.GetDenseApply(ZErrZHO, func(val float64) float64 {
+		ηHO := c.GetDenseApply(dErrdHO, func(val float64) float64 {
 			return val * n.η
 		})
 		// Update HO weights
@@ -121,16 +125,16 @@ func (n *RNN) BPTT(input, expected *m.Dense) (
 		for z := 0; z < n.Depth && t-z > 0; z++ {
 			// Now we update the IH weights just as we did in basicNN. First we
 			// calculate derivatives for weights in IH
-			ZErrZIH := c.GetOuterVec(currHidErr, acts[t-z].Inp)
+			dErrdIH := c.GetOuterVec(currHidErr, acts[t-z].Inp)
 			// Then we find the momentum-driven changes
-			ηIH := c.GetDenseApply(ZErrZIH, func(val float64) float64 {
+			ηIH := c.GetDenseApply(dErrdIH, func(val float64) float64 {
 				return val * n.η
 			})
 			// Finally we update IH weights
 			n.IH.Sub(n.IH, ηIH)
 			// Now the same for HH weights from (t-z-1) to (t-z)
-			ZErrZHH := c.GetOuterVec(currHidErr, acts[t-z-1].Hid)
-			ηHH := c.GetDenseApply(ZErrZHH, func(val float64) float64 {
+			dErrdHH := c.GetOuterVec(currHidErr, acts[t-z-1].Hid)
+			ηHH := c.GetDenseApply(dErrdHH, func(val float64) float64 {
 				return val * n.η
 			})
 			n.HH.Sub(n.HH, ηHH)
@@ -148,7 +152,7 @@ func (n *RNN) BPTT(input, expected *m.Dense) (
 
 // Forward accumulates sums and activations for each layer for each training
 // sample.
-func (n *RNN) Forward(input *m.Dense) (sums []*Sums, acts []*Acts) {
+func (n *Elman) Forward(input *m.Dense) (sums []*Sums, acts []*Acts) {
 	numSteps, _ := input.Dims()
 	// Allocate space for all weighted sums that we get while propagating
 	sums = make([]*Sums, numSteps)
@@ -182,7 +186,7 @@ func (n *RNN) Forward(input *m.Dense) (sums []*Sums, acts []*Acts) {
 
 // GetOutError returns the output layer error as (output activations − expected
 // activations) ⊙ sigmoidPrime(output sums).
-func (n *RNN) GetOutError(outActs, outSums, expected *m.Vector) *m.Vector {
+func (n *Elman) GetOutError(outActs, outSums, expected *m.Vector) *m.Vector {
 	outError := c.GetSubVec(outActs, expected)
 	return c.GetMulElemVec(outError, c.GetVectorSigmoidPrime(outSums))
 }
@@ -194,7 +198,7 @@ func (n *RNN) GetOutError(outActs, outSums, expected *m.Vector) *m.Vector {
 // of (L-to-L+1) weights to make the matrix operations possible.
 // After this backward-pass we multiply the (L)-errors by sigmoidPrime(L-sums),
 // just as in GetOutError().
-func (n *RNN) GetError(prevErrs, currSums *m.Vector, w *m.Dense) *m.Vector {
+func (n *Elman) GetError(prevErrs, currSums *m.Vector, w *m.Dense) *m.Vector {
 	wT := c.GetTransposed(w)
 	propagated := c.GetMulVec(wT, prevErrs)
 	return c.GetMulElemVec(propagated,
@@ -208,7 +212,7 @@ func (n *RNN) GetError(prevErrs, currSums *m.Vector, w *m.Dense) *m.Vector {
 //		getting a weighted sum of inputs for each hidden neuron);
 //  3.  Sums the results from steps 1, 2 and applies activation function
 //		(hyperbolic tanhent in this case).
-func (n *RNN) getHidden(prevHidden, sample *m.Vector) (sums, acts *m.Vector) {
+func (n *Elman) getHidden(prevHidden, sample *m.Vector) (sums, acts *m.Vector) {
 	fromInput := c.GetMulVec(n.IH, sample)
 	fromHidden := c.GetMulVec(n.HH, prevHidden)
 	sums = c.GetAddVec(fromInput, fromHidden)
@@ -218,7 +222,7 @@ func (n *RNN) getHidden(prevHidden, sample *m.Vector) (sums, acts *m.Vector) {
 
 // getOutput just multiplies hiddenToHidden matrix by previous hidden layer
 // (same as getting a weighted sum of inputs for each output neuron).
-func (n *RNN) getOutput(currHidden *m.Vector) (sums, acts *m.Vector) {
+func (n *Elman) getOutput(currHidden *m.Vector) (sums, acts *m.Vector) {
 	sums = c.GetMulVec(n.HO, currHidden)
 	acts = c.GetVectorSigmoid(sums)
 	return

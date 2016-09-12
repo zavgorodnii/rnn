@@ -18,7 +18,7 @@ type Args struct {
 
 // NN is a simple feed-forward neural network that has an input, a hidden and
 // an output layer. We use this simplified model (without the possibility to
-// add an arbitrary number of hidden layers) to reduce the number of obscure
+// add arbitrary number of hidden layers) to reduce the number of obscure
 // indices and to use only named entities.
 //
 // This network is not optimized at all, e.g. it uses neither mini-batches or
@@ -94,17 +94,17 @@ func (n *NN) RunEpochs(numEpochs int, input, expected *m.Dense) {
 // weight grows. As we want the error to become smaller, we *subtract* the
 // derivative times the learning rate from the actual weight.
 func (n *NN) Update(input, expected *m.Vector) {
-	𝑑Err𝑑IH, 𝑑Err𝑑HO, 𝑑Err𝑑HB, 𝑑Err𝑑OB := n.BackProp(input, expected)
-	ηIH := c.GetDenseApply(𝑑Err𝑑IH, func(val float64) float64 {
+	dErrdIH, dErrdHO, dErrdHB, dErrdOB := n.BackProp(input, expected)
+	ηIH := c.GetDenseApply(dErrdIH, func(val float64) float64 {
 		return val * n.η
 	})
-	ηHO := c.GetDenseApply(𝑑Err𝑑HO, func(val float64) float64 {
+	ηHO := c.GetDenseApply(dErrdHO, func(val float64) float64 {
 		return val * n.η
 	})
-	ηHB := c.GetVectorApply(𝑑Err𝑑HB, func(val float64) float64 {
+	ηHB := c.GetVectorApply(dErrdHB, func(val float64) float64 {
 		return val * n.η
 	})
-	ηOB := c.GetVectorApply(𝑑Err𝑑OB, func(val float64) float64 {
+	ηOB := c.GetVectorApply(dErrdOB, func(val float64) float64 {
 		return val * n.η
 	})
 	n.IH.Sub(n.IH, ηIH)
@@ -115,12 +115,12 @@ func (n *NN) Update(input, expected *m.Vector) {
 
 // BackProp performs a forward pass for the input vector, calculates the error
 // and returns:
-//	1. Error gradients on each of input-to-hidden weights (𝑑Err𝑑IH)
-//	2. Error gradients on each of hidden-to-output weights (𝑑Err𝑑HO)
-//	3. Error gradients on hidden layer biases (𝑑Err𝑑HB)
-// 	4. Error gradients on output layer biases (𝑑Err𝑑OB)
+//	1. Error gradients on each of input-to-hidden weights (dErrdIH)
+//	2. Error gradients on each of hidden-to-output weights (dErrdHO)
+//	3. Error gradients on hidden layer biases (dErrdHB)
+// 	4. Error gradients on output layer biases (dErrdOB)
 func (n *NN) BackProp(input, expected *m.Vector) (
-	𝑑Err𝑑IH, 𝑑Err𝑑HO *m.Dense, 𝑑Err𝑑HB, 𝑑Err𝑑OB *m.Vector) {
+	dErrdIH, dErrdHO *m.Dense, dErrdHB, dErrdOB *m.Vector) {
 	// Get weighted sums and activations for all layers
 	sums, acts := n.Forward(input)
 	// Calculate error for each neuron in the output layer
@@ -134,11 +134,11 @@ func (n *NN) BackProp(input, expected *m.Vector) (
 	// output layer). We could do this in a straightforward way like this:
 	//
 	// hoRows, hoCols := n.HO.Dims()
-	// 𝑑Err𝑑HO = m.NewDense(hoRows, hoCols, nil)
+	// dErrdHO = m.NewDense(hoRows, hoCols, nil)
 	// for j := 0; j < hoRows; j++ {
 	// 	for k := 0; k < hoCols; k++ {
 	// 		grad := acts.Hid.At(k, 0) * outErrs.At(j, 0)
-	// 		𝑑Err𝑑HO.Set(j, k, grad)
+	// 		dErrdHO.Set(j, k, grad)
 	// 	}
 	// }
 	//
@@ -153,12 +153,12 @@ func (n *NN) BackProp(input, expected *m.Vector) (
 	// So we'll use this shortcut to calculate gradients of output error on
 	// hidden-to-output weights by finding Outer(outErrs, acts.Hid) (which
 	// has the same dims as m.HO):
-	𝑑Err𝑑HO = c.GetOuterVec(outErrs, acts.Hid)
+	dErrdHO = c.GetOuterVec(outErrs, acts.Hid)
 	// And then we'll do the same for weights from input to hidden layer:
-	𝑑Err𝑑IH = c.GetOuterVec(hidErrs, acts.Inp)
+	dErrdIH = c.GetOuterVec(hidErrs, acts.Inp)
 	// Error gradients on hidden and output layer biases are just the errors
 	// on those layers
-	𝑑Err𝑑HB, 𝑑Err𝑑OB = hidErrs, outErrs
+	dErrdHB, dErrdOB = hidErrs, outErrs
 	return
 }
 

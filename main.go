@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 	"rnn/basicNN"
-	"rnn/vanillaRNN"
+	"rnn/elman"
 )
 
 func main() {
@@ -15,8 +15,8 @@ func main() {
 	switch os.Args[1] {
 	case "--basicNN":
 		basicNN.Test()
-	case "--vanillaRNN":
-		vanillaRNN.Test()
+	case "--Elman":
+		elman.Test()
 	default:
 		fmt.Printf("Unknown training mode: %s\n", os.Args[1])
 		printUsage()
@@ -25,6 +25,6 @@ func main() {
 }
 
 func printUsage() {
-	modes := "--basicNN | --SimpleRNN | --Elman-- | --Jordan | --LSTM"
+	modes := "--basicNN | --Elman-- | --Jordan | --LSTM"
 	fmt.Printf("Please provide the training mode: %s\n", modes)
 }

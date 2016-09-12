@@ -1,4 +1,4 @@
-package vanillaRNN
+package elman
 
 import (
 	"fmt"
@@ -7,7 +7,7 @@ import (
 )
 
 // Test runs @numEpochs iterations of introducing the Abstract Time Series
-// data to a vanilla RNN and prints the network's output after the last
+// data to an Elman RNN and prints the network's output after the last
 // iteration.
 func Test() {
 	rand.Seed(0)
@@ -27,7 +27,7 @@ func Test() {
 		NumOut: numOutput,
 		Depth:  3,
 	}
-	nn := NewRNN(args)
+	nn := NewElman(args)
 	input, expected := common.GetAbstractTimeSeries()
 	nn.RunEpochs(numEpochs, input, expected)
 }
