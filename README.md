@@ -1,6 +1,6 @@
 # rnn
 
-Source code for a [series](http://chisquared.org) of posts about recurrent neural networks.
+Source code for a [series](http://chisquared.org) of posts about recurrent neural networks. (It's in Russian though, beware.)
 
 You'll need to install the linear algebra library for Go:
 
@@ -19,15 +19,15 @@ go run main.go [--basicNN | --Elman-- | --Jordan | --LSTM]
 For example, training an Elman network looks like this:
 
 ```
-go run main.go --Elman
+$ go run main.go --Elman
 ====================================================
 Testing basic Vanilla RNN on sample series dataset:
 ====================================================
-Input: 1.0      .       .       .               Expected: .     1.0     .       .               Predicted: .    1.0     .       .
-Input: .        1.0     .       .               Expected: .     .       1.0     .               Predicted: .    .       1.0     .
-Input: .        .       1.0     .               Expected: .     .       .       1.0             Predicted: .    .       .       1.0
-Input: .        .       .       1.0             Expected: .     .       1.0     .               Predicted: .    .       1.0     .
-Input: .        .       1.0     .               Expected: .     1.0     .       .               Predicted: .    1.0     .       .
-Input: .        1.0     .       .               Expected: 1.0   .       .       .               Predicted: 1.0  .       .       .
+Expected: .     1.0     .       .               Predicted: .    1.0     .       .
+Expected: .     .       1.0     .               Predicted: .    .       1.0     .
+Expected: .     .       .       1.0             Predicted: .    .       .       1.0
+Expected: .     .       1.0     .               Predicted: .    .       1.0     .
+Expected: .     1.0     .       .               Predicted: .    1.0     .       .
+Expected: 1.0   .       .       .               Predicted: 1.0  .       .       .
 
 ```
