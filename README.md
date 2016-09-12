@@ -16,7 +16,7 @@ $ go run main.go [--basicNN | --Elman-- | --Jordan | --LSTM]
 
 ```
 
-For example, training an Elman network looks like this:
+For example, you can train an Elman network:
 
 ```
 $ go run main.go --Elman
