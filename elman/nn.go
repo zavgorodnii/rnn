@@ -34,7 +34,7 @@ type Elman struct {
 	HO     *m.Dense // Weights from hidden to output layer
 }
 
-// NewElman is a constructor for SimpleElman. Initializes weight matrices.
+// NewElman is a constructor for Elman. Initializes weight matrices.
 func NewElman(args *Args) *Elman {
 	out := &Elman{
 		η:      args.Eta,
@@ -58,7 +58,7 @@ func NewElman(args *Args) *Elman {
 	return out
 }
 
-// BPTT executes the Backpropagation Through Time algorithm to learn the
+// BPTT implements the Backpropagation Through Time algorithm to learn the
 // network's weight. As BPTT is a variation of standard Backpropagation, it
 // might be useful to look at basicNN code and look for similarities.
 // Note that we don't have a separate Update() method; all weights are updated
@@ -173,7 +173,7 @@ func (n *Elman) GetError(prevErrs, currSums *m.Vector, w *m.Dense) *m.Vector {
 		c.GetVectorSigmoidPrime(currSums))
 }
 
-// getHidden calculates current hidden state as follows:
+// GetHidden calculates current hidden state as follows:
 //	1. 	Multiplies inputToHidden matrix by the input sample (same as getting
 //		a weighted sum of inputs for each hidden neuron);
 // 	2.	Multiplies hiddenToHidden matrix by previous hidden layer (same as
@@ -188,7 +188,7 @@ func (n *Elman) GetHidden(prevHidden, sample *m.Vector) (sums, acts *m.Vector) {
 	return
 }
 
-// getOutput just multiplies hiddenToHidden matrix by previous hidden layer
+// GetOutput just multiplies hiddenToHidden matrix by previous hidden layer
 // (same as getting a weighted sum of inputs for each output neuron).
 func (n *Elman) GetOutput(currHidden *m.Vector) (sums, acts *m.Vector) {
 	sums = c.GetMulVec(n.HO, currHidden)
@@ -196,7 +196,7 @@ func (n *Elman) GetOutput(currHidden *m.Vector) (sums, acts *m.Vector) {
 	return
 }
 
-// RunEpochs executes BPTT algorithm for @input @numEpochs times.
+// RunEpochs runs the BPTT algorithm for @input @numEpochs times.
 func (n *Elman) RunEpochs(numEpochs int, input, expected *m.Dense) {
 	// For each epoch
 	for epoch := 0; epoch < numEpochs; epoch++ {
