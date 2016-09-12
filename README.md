@@ -20,9 +20,9 @@ For example, training an Elman network looks like this:
 
 ```
 go run main.go --Elman
-\====================================================
+====================================================
 Testing basic Vanilla RNN on sample series dataset:
-\====================================================
+====================================================
 Input: 1.0      .       .       .               Expected: .     1.0     .       .               Predicted: .    1.0     .       .
 Input: .        1.0     .       .               Expected: .     .       1.0     .               Predicted: .    .       1.0     .
 Input: .        .       1.0     .               Expected: .     .       .       1.0             Predicted: .    .       .       1.0
