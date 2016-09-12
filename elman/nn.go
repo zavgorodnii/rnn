@@ -105,16 +105,16 @@ func (n *Elman) BPTT(input, expected *m.Dense) (
 	for t := 0; t < numSteps; t++ {
 		// We start just as in basicNN. Calculate output layer error for @t
 		outError := n.GetOutError(acts[t].Out, sums[t].Out, expected.RowView(t))
-		// Calculate derivatives for weights in HO using this output layer
+		// Calculate derivatives for weights in HO using output layer error
 		dErrdHO := c.GetOuterVec(outError, acts[t].Hid)
-		// Calculate the changes for weights based on the derivatives from
+		// Calculate changes for HO weights based on the derivatives from
 		// previous step (this was done in a separate method in basicNN)
 		ηHO := c.GetDenseApply(dErrdHO, func(val float64) float64 {
 			return val * n.η
 		})
 		// Update HO weights
 		n.HO.Sub(n.HO, ηHO)
-		// Like in basicNN, we calculate hidden layer errors by propagating
+		// Like in basicNN, we calculate hidden layer errors by backpropagating
 		// output layer errors. These errors will be used as the starting point
 		// for the recursive calculation of hidden layer errors in the
 		// unfolding procedure.
@@ -141,7 +141,7 @@ func (n *Elman) BPTT(input, expected *m.Dense) (
 			// In the next iteration we need hidden errors for layer (t-z-1).
 			// We calculate them by propagating current (t-z) hidden errors
 			// to (t-z-1) via HH weights.
-			// When z is 0, @prevHidErr is just the "normal" basicNN-style
+			// When z is 0, @currHidErr is just the "normal" basicNN-style
 			// hidden layer error propagated from the output layer (because we
 			// need something to start with).
 			currHidErr = n.GetError(currHidErr, sums[t-z-1].Hid, n.HH)
