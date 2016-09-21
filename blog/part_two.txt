@@ -1,7 +1,155 @@
-В [предыдущей](http://chisquared.org/post/recurrent-neural-networks-part-1-basic-nn) статье мы полностью разобрали алгоритм обучения обычной сети прямого распространения.
+В [предыдущей](http://chisquared.org/post/recurrent-neural-networks-part-1-basic-nn) статье мы полностью разобрали алгоритм обучения обычной сети прямого распространения. Это было необходимо для того, чтобы мы могли быстро и безболезненно разобраться в том, как работает простейшая рекуррентная сеть Элмана.
+
+Как мы помним, в обученной *feed-forward* сети активация последовательно передается от слоя к слою; предсказание такой сети для любого примера в общем случае не зависит от последовательности примеров, предъявленных ей ранее.
+
+Проиллюстрируем сказанное. Предположим что у нас есть сеть, пытающаяся определить часть речи для слова, подаваемого ей на вход. В цепочке *the work* слово *work* вне контекста может быть и существительным, и глаголом. Однако наличие прямо перед ним артикля недвусмысленно говорит нам о том, что в данном случае речь идет именно о *work*-существительном. Если в векторе, характеризующем слово *work*, нет специального признака "предыдущее слово является артиклем", то обычная *feed-forward* сеть никак не сможет использовать контекстную информацию, чтобы точнее определить часть речи.
+
+Нам может хотеться избавиться от необходимости включать в информацию о слове признаки вроде "предыдущее слово является артиклем". Во-первых, артикль не всегда идет прямо перед словом (ср. *the good work*); во-вторых, мы не всегда можем знать все множество контекстных зависимостей, важных для успешного определения части речи. При недостатке экспертных знаний, относящихся к линейному порядку предъявляемых элементов, мы можем хотеть, чтобы сеть умела сама выявлять необходимые зависимости.
+
+Для этого и были разработаны рекуррентные нейронные сети. Предположим, что нам хочется, чтобы у нейронной сети была "память" о том примере, который был предъявлен ей прямо перед текущим. Очевидно, есть несколько способов организовать такую память. Например, можно сказать: пусть на скрытый слой подаётся не только текущий пример, но и активация скрытого слоя после предъявления предыдущего примера. Такая организация сети известна как *сеть Элмана* (см. рисунке ниже):
 
 <img width="40%" height="40%" src="/static/pics/elman_rnn.svg">
+<div style="text-align:center"><sub><sup>Здесь $HH$ – это веса от скрытого к скрытому слою, а *t* – номер текущего примера в общей последовательности примеров.</sup></sub></div>
 
-Бла-бла-бла, еще одна картинка.
+В коде инициализация такой нейронной сети может выглядеть вот так (весь код можно посмотреть в [репозитории](https://github.com/oopcode/rnn/blob/master/elman/nn.go)):
+
+```
+type Elman struct {
+	NumInp int
+	NumHid int
+	NumOut int
+	η      float64  // Learning rate
+	Depth  int      // Number of steps down the unfolded network
+	IH     *m.Dense // Weights from input to hidden layer
+	HH     *m.Dense // Weights from hidden to hidden layer
+	HO     *m.Dense // Weights from hidden to output layer
+}
+
+// NewElman is a constructor for Elman. Initializes weight matrices.
+func NewElman(args *Args) *Elman {
+	out := &Elman{
+		η:      args.Eta,
+		NumInp: args.NumInp,
+		NumHid: args.NumHid,
+		NumOut: args.NumOut,
+		Depth:  args.Depth,
+	}
+	// Initialize matrix of weights from input to hidden layer
+	out.IH = m.NewDense(out.NumHid, out.NumInp, nil)
+	out.HH = m.NewDense(out.NumHid, out.NumHid, nil)
+	out.HO = m.NewDense(out.NumOut, out.NumHid, nil)
+	// Initialize at random as in (Glorot & Bengio, 2010):
+	// Positive upper boundary for random init weights for inputToHidden
+	inputToHidden := math.Sqrt(1. / float64(out.NumInp))
+	// Positive upper boundary for random init weights for hiddenToAny
+	hiddenToAny := math.Sqrt(1. / float64(out.NumHid))
+	c.RandomDense(-inputToHidden, inputToHidden, out.IH)
+	c.RandomDense(-hiddenToAny, hiddenToAny, out.HH)
+	c.RandomDense(-hiddenToAny, hiddenToAny, out.HO)
+	return out
+}
+```
+<sub><sup>**ВНИМАНИЕ!** В данной статье не будут обсуждаться те особенности кода, которые уже были рассмотрены в предыдущей части. Также не будет приводиться код функций, идентичных определенным в предыдущей части.</sup></sub>
+
+Концептуально наша сеть практически не изменилась по сравнению с обычной сетью прямого распространения. Собственно процедура передачи активации со входного на внешний слой усложнилась лишь в том смысле, что теперь активация скрытого слоя находится с учетом активации скрытого слоя на предыдущем шаге. То есть, мы пропускаем активации входного слоя через веса $IH$, пропускаем активации входного слоя через веса $HH$, а потом просто суммируем полученные вектора и применяем функцию активации:
+
+```
+func (n *Elman) GetHidden(prevHidden, sample *m.Vector) (sums, acts *m.Vector) {
+	fromInput := c.GetMulVec(n.IH, sample)
+	fromHidden := c.GetMulVec(n.HH, prevHidden)
+	sums = c.GetAddVec(fromInput, fromHidden)
+	acts = c.GetVectorSigmoid(sums)
+	return
+}
+```
+
+Есть, однако, чисто "организационные" изменения процедуры распространения. Мы ещё ничего не говорили об обучении такой сети, однако для него необходимо, чтобы выполнялись следующие требования:
+
+1. Примеры должны подаваться на вход сериями (например, все слова-вектора из одного предложения);
+2. На каждом шаге обучения сети нужно последовательно предъявлять все примеры из серии;
+3. Мы должны иметь доступ ко взвешенным суммам и активациям каждого слоя для каждого примера из серии.
+
+В коде это выглядит вот так:
+
+```
+func (n *Elman) Forward(input *m.Dense) (sums []*Sums, acts []*Acts) {
+	numSteps, _ := input.Dims()
+	// Allocate space for all weighted sums that we get while propagating
+	sums = make([]*Sums, numSteps)
+	for i := 0; i < numSteps; i++ {
+		sums[i] = &Sums{}
+	}
+	// Allocate space for all activations that we get while propagating
+	acts = make([]*Acts, numSteps)
+	for i := 0; i < numSteps; i++ {
+		acts[i] = &Acts{}
+	}
+	// At first time step we have no previous hidden state, so we explicitly
+	// calculate hidden state (t) with a zero magnitude (t-1) hidden state and
+	// the first (initial) training sample
+	acts[0].Inp = input.RowView(0)
+	sums[0].Hid, acts[0].Hid = n.GetHidden(
+		m.NewVector(n.NumHid, nil), acts[0].Inp,
+	)
+	sums[0].Out, acts[0].Out = n.GetOutput(acts[0].Hid)
+	// For each time step
+	for t := 1; t < numSteps; t++ {
+		currSample := input.RowView(t)
+		prevHidden := acts[t-1].Hid
+		acts[t].Inp = currSample
+		sums[t].Hid, acts[t].Hid = n.GetHidden(prevHidden, currSample)
+		currHidden := acts[t].Hid
+		sums[t].Out, acts[t].Out = n.GetOutput(currHidden)
+	}
+	return
+}
+```
+<sub><sup>Каждый ряд матрицы *input* –  это отдельный вектор-пример из серии. Поскольку при предъявлении самого первого примера у нас нет активации скрытого слоя с предыдущего шага, мы используем "нулевую" активацию. </sup></sub>
+
+Теперь поговорим об обучении такой сети. Оно очень похоже на обучение *feed-forward* сети (см. [предыдущую](http://chisquared.org/post/recurrent-neural-networks-part-1-basic-nn) часть), поэтому мы не будем вдаваться в подробности вычисления производных по ошибкам и весам, а сосредоточимся на изменениях в общем алгоритме.
+
+
+Посмотрим сначала на то, как можно "развернуть во времени" сеть Элмана (см. рисунок ниже):
 
 <img width="60%" height="60%" src="/static/pics/elman_rnn_unfolded.svg">
+
+Здесь $ t $ – это номер последнего примера, предъявленного сети,  $Inp(t)$ – собственно последний пример, а $Hid(t - 1)$ – активация скрытого слоя после предъявления примера номер $(t - 1)$. Очевидно, что данной сети было предъявлено всего три примера, а $Hid(t - 3)$ – та самая "нулевая" активация скрытого слоя для самого первого примера, которую мы видели в коде выше.
+
+Посмотрим теперь, как мы будем обучать такую сеть после предъявления серии примеров. Мы будем двигаться от последнего примера к первому, потому что это в некотором смысле нагляднее (хотя на практике никакой разницы нет – попытайтесь по прочтении понять, почему).
+
+Итак, мы предъявили сети несколько примеров и имеем активацию внешнего слоя (предсказание сети) после предъявления последнего примера. Как и в *feed-forward* сети, сначала мы найдем необходимое изменение $HO$ весов:
+
+```
+func (n *Elman) BPTT(input, expected *m.Dense) (dErrdIH, dErrdHH, dErrdHO *m.Dense) {
+	numSteps, _ := input.Dims()
+	// Forward pass: get sums and activations for each layer for @numSteps
+	// samples. See n.Forward() for details.
+	sums, acts := n.Forward(input)
+	// For each sample @t in the @input
+	for t := numSteps - 1; t >= 0; t-- {
+		// We start just as in basicNN. Calculate output layer error for @t
+		outError := n.GetOutError(acts[t].Out, sums[t].Out, expected.RowView(t))
+		// Calculate derivatives for weights in HO using output layer error
+		dErrdHO := c.GetOuterVec(outError, acts[t].Hid)
+		// Calculate changes for HO weights based on the derivatives from
+		// previous step (this was done in a separate method in basicNN)
+		ηHO := c.GetDenseApply(dErrdHO, func(val float64) float64 {
+			return val * n.η
+		})
+		// Update HO weights
+		n.HO.Sub(n.HO, ηHO)
+```
+
+Можно заметить, что в коде выше мы сразу же обновляем веса, хотя в предыдущей статье мы просто находили производные типа *dErrdHO* (обновление весов происходило в отдельной функции). Здесь, поскольку мы работаем сразу же со множеством примеров, так удобнее.
+
+Ошибка для слоя $ Hid(t-1) $ находится так же, как и раньше – распространяется с внешнего слоя:
+
+```
+		// Like in basicNN, we calculate hidden layer errors by backpropagating
+		// output layer errors. These errors will be used as the starting point
+		// for the recursive calculation of hidden layer errors in the
+		// unfolding procedure.
+		currHidErr := n.GetError(outError, sums[t].Hid, n.HO)
+```
+
+И вот тут начинается самое интересное. Перед нами встает вопрос: как обновлять веса $ IH $ и $ HH $? По большому счету
