@@ -133,8 +133,8 @@ func (n *Elman) Forward(input *m.Dense) (sums []*Sums, acts []*Acts) {
 		acts[i] = &Acts{}
 	}
 	// At first time step we have no previous hidden state, so we explicitly
-	// create it with a zero magnitude t-1 hidden state and the first (initial)
-	// training sample
+	// calculate hidden state (t) with a zero magnitude (t-1) hidden state and
+	// the first (initial) training sample
 	acts[0].Inp = input.RowView(0)
 	sums[0].Hid, acts[0].Hid = n.GetHidden(
 		m.NewVector(n.NumHid, nil), acts[0].Inp,
