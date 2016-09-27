@@ -54,18 +54,19 @@ func LoadFromCSV(path string, vectorLen int) (out *mat64.Dense) {
 	return out
 }
 
-// GetAbstractTimeSeries creates a time-series dataset with a certain pattern:
-// the input is an "angle" of ones, and the expected output is the same angle
-// shifted by one position to the right. A recurrent NN should be able to
-// learn this pattern.
-func GetAbstractTimeSeries() (input, expected *mat64.Dense) {
-	input = mat64.NewDense(6, 4, nil)
-	input.SetRow(0, []float64{1., 0, 0, 0})
-	input.SetRow(1, []float64{0, 1., 0, 0})
-	input.SetRow(2, []float64{0, 0, 1., 0})
-	input.SetRow(3, []float64{0, 0, 0, 1.})
-	input.SetRow(4, []float64{0, 0, 1., 0})
-	input.SetRow(5, []float64{0, 1., 0, 0})
+// GetAbstractTimeSeries1Step creates a time-series dataset. The X sample
+// pattern occurs twice in the dataset and predicts different things depending
+// on the X-1 pattern. Thus a neural network needs to have at least a 1-step
+// memory.
+func GetAbstractTimeSeries1() (input, expected *mat64.Dense) {
+	input = mat64.NewDense(6, 4, []float64{
+		1., 0, 0, 0,
+		0, 1., 0, 0, // X-1
+		0, 0, 1., 0, // X
+		0, 0, 0, 1., // X-1
+		0, 0, 1., 0, // X
+		0, 1., 0, 0,
+	})
 	expected = mat64.NewDense(6, 4, nil)
 	expected.SetRow(0, []float64{0, 1., 0, 0})
 	expected.SetRow(1, []float64{0, 0, 1., 0})
@@ -73,5 +74,29 @@ func GetAbstractTimeSeries() (input, expected *mat64.Dense) {
 	expected.SetRow(3, []float64{0, 0, 1., 0})
 	expected.SetRow(4, []float64{0, 1., 0, 0})
 	expected.SetRow(5, []float64{1., 0, 0, 0})
+	return
+}
+
+// GetAbstractTimeSeries2 creates a time-series dataset. The X sample
+// pattern occurs twice in the dataset and predicts different things depending
+// on the X-2 pattern. Thus a neural network needs to have at least a 2-step
+// memory.
+func GetAbstractTimeSeries2() (input, expected *mat64.Dense) {
+	input = mat64.NewDense(6, 4, []float64{
+		1., 0, 0, 0, // X-2 <--
+		0, 1., 0, 0, // X-1
+		0, 0, 0, 1., // X
+		0, 1., 0, 0, // X-2 <--
+		0, 1., 0, 0, // X-1
+		0, 0, 0, 1., // X
+	})
+	expected = mat64.NewDense(6, 4, []float64{
+		0, 0, 0, 0,
+		0, 0, 0, 0,
+		0, 1., 0, 0,
+		0, 0, 0, 0,
+		0, 0, 0, 0,
+		1., 0, 0, 0,
+	})
 	return
 }
