@@ -152,4 +152,42 @@ func (n *Elman) BPTT(input, expected *m.Dense) (dErrdIH, dErrdHH, dErrdHO *m.Den
 		currHidErr := n.GetError(outError, sums[t].Hid, n.HO)
 ```
 
-И вот тут начинается самое интересное. Перед нами встает вопрос: как обновлять веса $ IH $ и $ HH $? По большому счету
+И вот тут начинается самое интересное. Перед нами встает вопрос: как обновлять веса $ IH $ и $ HH $? Алгоритм выглядит так. Мы берем некоторую *глубину* обучения $ z $ и последовательно распространяем ошибку по скрытым слоям вплоть до $ Hid(t-z) $; причем для каждого скрытого слоя мы вычисляем (и применяем) требуемое изменение $ IH $ и $ HH $ весов ровно так же, как делали в *feed-forward* сети для $ IH $ весов:
+
+```
+		// Start unfolding the network @n.Depth steps back. This is a "moving
+		// backwards" procedure, and @z is the number of steps back through the
+		// unfolded network
+		for z := 0; z < n.Depth && t-z > 0; z++ {
+			// Now we update the IH weights just as we did in basicNN. First we
+			// calculate derivatives for weights in IH
+			dErrdIH := c.GetOuterVec(currHidErr, acts[t-z].Inp)
+			// Then we find the momentum-driven changes
+			ηIH := c.GetDenseApply(dErrdIH, func(val float64) float64 {
+				return val * n.η
+			})
+			// Finally we update IH weights
+			n.IH.Sub(n.IH, ηIH)
+			// Now the same for HH weights from (t-z-1) to (t-z)
+			dErrdHH := c.GetOuterVec(currHidErr, acts[t-z-1].Hid)
+			ηHH := c.GetDenseApply(dErrdHH, func(val float64) float64 {
+				return val * n.η
+			})
+			n.HH.Sub(n.HH, ηHH)
+			// In the next iteration we need hidden errors for layer (t-z-1).
+			// We calculate them by propagating current (t-z) hidden errors
+			// to (t-z-1) via HH weights.
+			// When z is 0, @currHidErr is just the "normal" basicNN-style
+			// hidden layer error propagated from the output layer (because we
+			// need something to start with).
+			currHidErr = n.GetError(currHidErr, sums[t-z-1].Hid, n.HH)
+		}
+```
+<sub><sup>При разборе кода очень рекомендуется смотреть на картинку с развернутой сетью – это поможет лучше прочувствовать каждый шаг алгоритма.</sup></sub>
+
+Иными словами, мы распространяем какое-то количество примеров из серии, потом берем срез развернутой сети глубины $ z $ как единое целое и обучаемся ровно по тому же принципу, что и в *feed-forward* сети (распространяем ошибку так глубоко, как только можем).
+
+Поговорим, однако, вот о чем. Мы можем чисто "механически" понимать, почему этот алгоритм работает (производные по весам, распространение ошибки, etc.). Однако что, все-таки, представляет собой скрытый слой в такой сети? Очевидно, что на каждом шаге в нём каким-то образом оказывается информация как о текущем примере, так и предыдущих примерах (иначе сеть не могла бы функционировать так, как нам того хочется).
+
+Прежде всего нужно понимать, что скрытый слой **не содержит в себе прямой копии** предыдущего примера.  Будь это так, то скрытый слой был бы обязан содержать как минимум столько же нейронов, сколько и входной. Также было бы непонятно, как именно сеть научилась бы учитывать контексты длиной больше единицы.
+

@@ -100,3 +100,27 @@ func GetAbstractTimeSeries2() (input, expected *mat64.Dense) {
 	})
 	return
 }
+
+func GetAbstractTimeSeries3() (input, expected *mat64.Dense) {
+	input = mat64.NewDense(8, 4, []float64{
+		0, 1., 0, 0, // X-3 <--
+		0, 1., 0, 0, // X-2 <--
+		0, 0, 1., 0, // X-1
+		0, 0, 0, 1., // X
+		1., 0, 0, 0, // X-3 <--
+		0, 1., 0, 0, // X-2 <--
+		0, 0, 1., 0, // X-1
+		0, 0, 0, 1., // X
+	})
+	expected = mat64.NewDense(8, 4, []float64{
+		0, 0, 0, 0,
+		0, 0, 0, 0,
+		0, 0, 0, 0,
+		0, 1., 0, 0,
+		0, 0, 0, 0,
+		0, 0, 0, 0,
+		0, 0, 0, 0,
+		1., 0, 0, 0,
+	})
+	return
+}

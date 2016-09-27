@@ -10,7 +10,7 @@ import (
 func PrintDense(m *mat64.Dense) {
 	numRows, _ := m.Dims()
 	for i := 0; i < numRows; i++ {
-		PrintVectorStrip(m.RowView(i))
+		PrintVector(m.RowView(i))
 	}
 	fmt.Printf("\n")
 }

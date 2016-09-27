@@ -98,7 +98,7 @@ func (n *Elman) BPTT(input, expected *m.Dense) (
 			ηIH := c.GetDenseApply(dErrdIH, func(val float64) float64 {
 				return val * n.η
 			})
-			// Finally we update IH weights
+			// Update IH weights
 			n.IH.Sub(n.IH, ηIH)
 			// Now the same for HH weights from (t-z-1) to (t-z)
 			dErrdHH := c.GetOuterVec(currHidErr, acts[t-z-1].Hid)
