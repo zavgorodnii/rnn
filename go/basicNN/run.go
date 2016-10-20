@@ -3,7 +3,7 @@ package basicNN
 import (
 	"fmt"
 	"math/rand"
-	"rnn/common"
+	"rnn/go/common"
 )
 
 // Test tests the basic NN on the Iris dataset.

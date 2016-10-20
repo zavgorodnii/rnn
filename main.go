@@ -3,8 +3,8 @@ package main
 import (
 	"fmt"
 	"os"
-	"rnn/basicNN"
-	"rnn/elman"
+	"rnn/go/basicNN"
+	"rnn/go/elman"
 )
 
 func main() {

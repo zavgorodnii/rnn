@@ -3,7 +3,7 @@ package elman
 import (
 	"fmt"
 	"math/rand"
-	"rnn/common"
+	"rnn/go/common"
 )
 
 // Test runs @numEpochs iterations of introducing the Abstract Time Series

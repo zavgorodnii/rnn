@@ -3,7 +3,7 @@ package elman
 import (
 	"fmt"
 	"math"
-	c "rnn/common"
+	c "rnn/go/common"
 
 	m "github.com/gonum/matrix/mat64"
 )
