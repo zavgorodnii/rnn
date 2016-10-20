@@ -68,3 +68,5 @@ Input:  .  .  .  1  Expected:  .  .  1  .  Predicted:  .  .  1  .
 Input:  .  .  1  .  Expected:  .  1  .  .  Predicted:  .  1  .  .
 Input:  .  1  .  .  Expected:  1  .  .  .  Predicted:  1  .  .  .
 ```
+
+This repository also contains source code for RNNs implemented in Python using the awesome [Tensorflow](https://tensorflow.org) library. You'll need to install tensorflow to run those sources.
